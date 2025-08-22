@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import { AnalysisResult, AnaliseDadosPessoais, DadosPessoaisItem, InventarioIDP, RascunhoRIPD, SugestoesAutomacao, LogAnalise } from '../../types/index';
-import { CodeViewer } from '../CodeViewer/index';
 import { BpmnViewer } from '../BpmnViewer/index';
 // import { DmnViewer } from '../DmnViewer/index';
 
 type ArtifactKey = keyof AnalysisResult;
-type Tab = 'visual' | 'dmn' | 'analise' | 'inventario' | 'ripd' | 'sugestoes' | 'log';
+type Tab = 'visual' | 'analise' | 'inventario' | 'ripd' | 'sugestoes' | 'log';
 
 const artifactTabMap: Record<Tab, ArtifactKey | null> = {
     visual: 'processo_visual',
-    dmn: 'processo_visual',
     analise: 'analise_dados_pessoais',
     inventario: 'inventario_idp',
     ripd: 'rascunho_ripd',
@@ -39,20 +37,20 @@ const DataTable: React.FC<{title: string, data: DadosPessoaisItem[]}> = ({ title
     return (
         <div className="mb-6">
             <h4 className="font-semibold text-on-surface-light dark:text-on-surface-dark mb-2">{title}</h4>
-            <div className="overflow-x-auto border border-border-light dark:border-border-dark rounded-lg">
-                <table className="min-w-full divide-y divide-border-light dark:divide-border-dark text-sm">
+            <div className="border border-border-light dark:border-border-dark rounded-lg overflow-hidden">
+                <table className="w-full divide-y divide-border-light dark:divide-border-dark text-sm table-fixed">
                     <thead className="bg-gray-50 dark:bg-white/5">
                         <tr>
-                            <th scope="col" className="px-4 py-3 text-left font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark uppercase tracking-wider">Dado</th>
-                            <th scope="col" className="px-4 py-3 text-left font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark uppercase tracking-wider">Finalidade</th>
-                            <th scope="col" className="px-4 py-3 text-left font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark uppercase tracking-wider">Classificação</th>
+                            <th scope="col" className="w-[30%] px-4 py-3 text-left font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark uppercase tracking-wider">Dado</th>
+                            <th scope="col" className="w-[50%] px-4 py-3 text-left font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark uppercase tracking-wider">Finalidade</th>
+                            <th scope="col" className="w-[20%] px-4 py-3 text-left font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark uppercase tracking-wider">Classificação</th>
                         </tr>
                     </thead>
                     <tbody className="bg-surface-light dark:bg-surface-dark divide-y divide-border-light dark:divide-border-dark">
                         {data.map((item, index) => (
                             <tr key={index}>
-                                <td className="px-4 py-3 whitespace-nowrap font-medium text-on-surface-light dark:text-on-surface-dark">{item.dado}</td>
-                                <td className="px-4 py-3 whitespace-normal text-on-surface-light dark:text-on-surface-dark">{item.finalidade}</td>
+                                <td className="px-4 py-3 whitespace-normal break-words font-medium text-on-surface-light dark:text-on-surface-dark">{item.dado}</td>
+                                <td className="px-4 py-3 whitespace-normal break-words text-on-surface-light dark:text-on-surface-dark">{item.finalidade}</td>
                                 <td className="px-4 py-3 whitespace-nowrap">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.classificacao === 'Sensível' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-green-100 text-green-800 dark:bg-ifsc-green/20 dark:text-green-200'}`}>
                                         {item.classificacao}
@@ -74,18 +72,77 @@ const AnaliseView: React.FC<{data: AnaliseDadosPessoais}> = ({ data }) => (
     </div>
 );
 
-const InventarioView: React.FC<{data: InventarioIDP}> = ({ data }) => (
-    <div className="border border-border-light dark:border-border-dark rounded-lg p-4">
-        <dl className="divide-y divide-border-light dark:divide-border-dark">
-            {Object.entries(data).map(([key, value]) => (
-                <div key={key} className="py-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-on-surface-secondary-light dark:text-on-surface-secondary-dark">{formatKey(key)}</dt>
-                    <dd className="text-sm text-on-surface-light dark:text-on-surface-dark md:col-span-2">{Array.isArray(value) ? value.join(', ') : String(value ?? 'N/A')}</dd>
-                </div>
-            ))}
-        </dl>
-    </div>
+const RenderValue: React.FC<{ value: any }> = ({ value }) => {
+    if (value === null || value === undefined) {
+        return <span className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark">N/A</span>;
+    }
+
+    if (Array.isArray(value)) {
+        if (value.length === 0) return <span className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark">Nenhum item</span>;
+
+        return (
+            <div className="space-y-2">
+                {value.map((item, index) => (
+                    <div key={index} className="pl-4 border-l-2 border-border-light dark:border-border-dark">
+                        <RenderValue value={item} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    if (typeof value === 'object') {
+        return (
+            <div className="space-y-2 w-full">
+                {Object.entries(value).map(([key, val]) => (
+                    <div key={key} className="grid grid-cols-1 sm:grid-cols-3 gap-x-4">
+                        <div className="font-semibold text-on-surface-light dark:text-on-surface-dark sm:col-span-1">{formatKey(key)}</div>
+                        <div className="sm:col-span-2"><RenderValue value={val} /></div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    
+    if (typeof value === 'boolean') {
+        return value ? <span className="font-semibold text-green-600 dark:text-green-400">Sim</span> : <span className="font-semibold text-red-600 dark:text-red-400">Não</span>;
+    }
+
+
+    return <span className="whitespace-pre-wrap break-words">{String(value)}</span>;
+};
+
+
+const InventarioSection: React.FC<{ title: string; data: any; defaultOpen?: boolean }> = ({ title, data, defaultOpen = false }) => (
+    <details className="border border-border-light dark:border-border-dark rounded-lg mb-4 open:shadow-lg transition-shadow" open={defaultOpen}>
+        <summary className="px-4 py-3 font-semibold text-on-surface-light dark:text-on-surface-dark cursor-pointer bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors rounded-t-lg">
+            {title}
+        </summary>
+        <div className="p-4 border-t border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark rounded-b-lg">
+           <RenderValue value={data} />
+        </div>
+    </details>
 );
+
+const InventarioView: React.FC<{ data: InventarioIDP }> = ({ data }) => {
+    if (!data || typeof data !== 'object') {
+        return <div className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark">Dados do inventário inválidos ou ausentes.</div>;
+    }
+
+    return (
+        <div>
+            {Object.entries(data).map(([key, value], index) => (
+                <InventarioSection
+                    key={key}
+                    title={formatKey(key)}
+                    data={value}
+                    defaultOpen={index < 2} // Open first two sections by default
+                />
+            ))}
+        </div>
+    );
+};
+
 
 const RipdView: React.FC<{ markdown: RascunhoRIPD }> = ({ markdown }) => {
     if (markdown === null) {
@@ -94,7 +151,7 @@ const RipdView: React.FC<{ markdown: RascunhoRIPD }> = ({ markdown }) => {
       );
     }
     const html = marked(markdown);
-    return <div className="prose prose-sm max-w-none dark:prose-invert prose-p:text-gray-600 dark:prose-p:text-gray-300" dangerouslySetInnerHTML={{ __html: html }} />;
+    return <div className="p-4 border border-border-light dark:border-border-dark rounded-lg bg-white dark:bg-gray-800/50"><div className="prose prose-sm max-w-none dark:prose-invert prose-p:text-gray-600 dark:prose-p:text-gray-300" dangerouslySetInnerHTML={{ __html: html }} /></div>;
 };
 
 const SugestoesView: React.FC<{ suggestions: SugestoesAutomacao }> = ({ suggestions }) => (
@@ -183,15 +240,13 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
 
     switch (activeTab) {
       case 'visual':
-        return results.processo_visual ? <BpmnViewer xml={results.processo_visual.bpmn_xml} /> : null;
-      // case 'dmn':
-      //   return results.processo_visual?.dmn_xml ? (
-      //     <DmnViewer xml={results.processo_visual.dmn_xml} />
-      //   ) : (
-      //     <div className="text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark py-10">
-      //       Nenhum modelo de decisão (DMN) foi gerado para este processo.
-      //     </div>
-      //   );
+        if (!results.processo_visual) return null;
+        return (
+            <div className="space-y-6">
+                {results.processo_visual.bpmn_xml && <BpmnViewer xml={results.processo_visual.bpmn_xml} />}
+                {/* {results.processo_visual.dmn_xml && <DmnViewer xml={results.processo_visual.dmn_xml} />} */}
+            </div>
+        );
       case 'analise':
         return results.analise_dados_pessoais ? <AnaliseView data={results.analise_dados_pessoais} /> : null;
       case 'inventario':
@@ -206,12 +261,30 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
         return null;
     }
   };
+  
+  const isAnaliseDisabled = !results.processo_visual;
+  const isInventarioDisabled = !results.analise_dados_pessoais;
+  const isRipdDisabled = !results.inventario_idp;
+  const isSugestoesDisabled = !results.processo_visual;
+  const isLogDisabled = !results.processo_visual;
 
-  const TabButton = ({ tabId, children }: { tabId: Tab, children: React.ReactNode }) => (
-    <button onClick={() => handleTabClick(tabId)} className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === tabId ? 'bg-ifsc-green text-white shadow' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark hover:bg-black/5 dark:hover:bg-white/10'}`}>
+  const TabButton = ({ tabId, children, disabled }: { tabId: Tab, children: React.ReactNode, disabled?: boolean }) => (
+    <button 
+        onClick={() => !disabled && handleTabClick(tabId)} 
+        className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === tabId ? 'bg-ifsc-green text-white shadow' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}
+        disabled={disabled}
+    >
       {children}
     </button>
   );
+
+    const Arrow: React.FC<{ disabled?: boolean }> = ({ disabled }) => (
+        <div className="flex items-center" aria-hidden="true">
+            <svg className={`h-5 w-5 ${disabled ? 'text-gray-300 dark:text-gray-600' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+        </div>
+    );
 
   const refiningLog = thinkingLogs.refining || [];
 
@@ -220,14 +293,19 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
       <div>
         <h2 className="text-xl font-semibold text-on-surface-light dark:text-on-surface-dark mb-4">2. Artefatos Gerados</h2>
         <div className="border-b border-border-light dark:border-border-dark mb-4">
-          <nav className="flex space-x-1 sm:space-x-2 overflow-x-auto pb-2 -mb-px" aria-label="Tabs">
-            <TabButton tabId="visual">BPMN</TabButton>
-            {/* <TabButton tabId="dmn">DMN</TabButton> */}
-            <TabButton tabId="analise">Análise de Dados</TabButton>
-            <TabButton tabId="inventario">Inventário (IDP)</TabButton>
-            <TabButton tabId="ripd">Rascunho RIPD</TabButton>
-            <TabButton tabId="sugestoes">Sugestões</TabButton>
-            <TabButton tabId="log">Log</TabButton>
+          <nav className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-2 -mb-px" aria-label="Tabs">
+            <TabButton tabId="visual">Processo</TabButton>
+            <Arrow disabled={isAnaliseDisabled} />
+            <TabButton tabId="analise" disabled={isAnaliseDisabled}>Dados Pessoais</TabButton>
+            <Arrow disabled={isInventarioDisabled} />
+            <TabButton tabId="inventario" disabled={isInventarioDisabled}>Inventário de Dados</TabButton>
+            <Arrow disabled={isRipdDisabled} />
+            <TabButton tabId="ripd" disabled={isRipdDisabled}>Relatório de Impacto</TabButton>
+            
+            <div className="h-4 border-l border-border-light dark:border-border-dark mx-2 sm:mx-3 self-center"></div>
+
+            <TabButton tabId="sugestoes" disabled={isSugestoesDisabled}>Sugestões</TabButton>
+            <TabButton tabId="log" disabled={isLogDisabled}>Log IA</TabButton>
           </nav>
         </div>
       </div>
@@ -242,7 +320,7 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
         <textarea
           value={correctionText}
           onChange={onCorrectionTextChange}
-          placeholder="Ex: Adicione a tarefa 'Aprovação do Comitê' após a 'Análise do RH'."
+          placeholder="Ex: Adicione a tarefa 'Aprovação do Comitê' após a 'Análise da Gestão de Pessoas'."
           className="w-full h-24 p-4 border border-border-light dark:border-border-dark bg-background-light dark:bg-gray-700 rounded-lg focus:ring-2 focus:ring-ifsc-green focus:border-ifsc-green transition-shadow duration-200 resize-none text-sm text-on-surface-light dark:text-on-surface-dark placeholder:text-gray-400 dark:placeholder:text-gray-500"
           disabled={isRefining}
         />

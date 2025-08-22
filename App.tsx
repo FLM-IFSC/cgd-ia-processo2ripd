@@ -183,22 +183,24 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen font-sans flex flex-col items-center bg-background-light dark:bg-background-dark text-on-surface-light dark:text-on-surface-dark transition-colors duration-200">
-      <Header theme={theme} toggleTheme={toggleTheme} />
+      <Header theme={theme} toggleTheme={toggleTheme} onReset={handleReset} />
       <main className="flex-grow w-full max-w-screen-2xl px-4 md:px-8 py-8">
-        <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="w-full h-full grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          <ProcessInput
-            textValue={processDescription}
-            onTextChange={(e) => setProcessDescription(e.target.value)}
-            fileValue={uploadedFile}
-            onFileChange={setUploadedFile}
-            onAnalyze={handleAnalyze}
-            onReset={handleReset}
-            isLoading={isLoading}
-            placeholder={EXAMPLE_PROCESS_TEXT}
-          />
+          <div className="lg:col-span-1">
+            <ProcessInput
+              textValue={processDescription}
+              onTextChange={(e) => setProcessDescription(e.target.value)}
+              fileValue={uploadedFile}
+              onFileChange={setUploadedFile}
+              onAnalyze={handleAnalyze}
+              onReset={handleReset}
+              isLoading={isLoading}
+              placeholder={EXAMPLE_PROCESS_TEXT}
+            />
+          </div>
           
-          <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark p-6 flex flex-col min-h-[500px] h-full">
+          <div className="lg:col-span-2 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark p-6 flex flex-col min-h-[500px] h-full">
             {isLoading && (
               <div className="flex-grow flex flex-col items-center justify-center text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark">
                 <svg className="animate-spin h-10 w-10 text-ifsc-green mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -258,10 +260,7 @@ const App: React.FC = () => {
           <strong>Aviso Importante:</strong> Esta ferramenta é um desenvolvimento experimental. Os artefatos gerados por Inteligência Artificial (BPMN, DMN, RIPD, etc.) são rascunhos e <strong>devem ser obrigatoriamente revisados e validados por um especialista humano</strong> antes de qualquer uso oficial.
         </p>
          <p>
-          Desenvolvido pela Coordenadoria de Gestão de Dados (CGD) da DTIC do IFSC - Reitoria.
-        </p>
-         <p>
-          Dúvidas ou sugestões? Entre em contato pelo e-mail: <a href="mailto:coord.gestao.dados@ifsc.edu.br" className="text-ifsc-green hover:underline">coord.gestao.dados@ifsc.edu.br</a>
+          Desenvolvido por FLM na Coordenadoria de Gestão de Dados (CGD) da DTIC do IFSC - Reitoria. Dúvidas ou sugestões, entre em contato pelo e-mail: <a href="mailto:coord.gestao.dados@ifsc.edu.br" className="text-ifsc-green hover:underline">coord.gestao.dados@ifsc.edu.br</a>
         </p>
       </footer>
     </div>

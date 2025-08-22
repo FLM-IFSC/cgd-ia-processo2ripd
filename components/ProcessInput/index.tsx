@@ -51,26 +51,22 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
 
   return (
     <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark p-6 flex flex-col h-full">
-      <div className="flex justify-between items-center mb-1">
+      <div className="mb-1">
         <h2 className="text-xl font-semibold text-on-surface-light dark:text-on-surface-dark">1. Forneça o Processo</h2>
-        <button
-          onClick={onReset}
-          className="text-xs text-on-surface-secondary-light dark:text-on-surface-secondary-dark hover:bg-black/5 dark:hover:bg-white/10 px-2 py-1 rounded-md transition-colors"
-          title="Limpar campos e resultados para iniciar uma nova análise"
-        >
-          Novo Processo
-        </button>
       </div>
       <p className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-4">Descreva em linguagem natural e/ou envie um arquivo (imagem, .bpmn, .xml, e projetos .bpm/.diag do Bizagi).</p>
       
-      <div className="flex flex-col space-y-4 flex-grow">
-        <textarea
-          value={textValue}
-          onChange={onTextChange}
-          placeholder={placeholder}
-          className="w-full h-48 p-4 border border-border-light dark:border-border-dark bg-background-light dark:bg-gray-700 rounded-lg focus:ring-2 focus:ring-ifsc-green focus:border-ifsc-green transition-shadow duration-200 resize-none text-sm leading-relaxed text-on-surface-light dark:text-on-surface-dark placeholder:text-gray-400 dark:placeholder:text-gray-500"
-          disabled={isLoading}
-        />
+      <div className="flex flex-col space-y-4 flex-grow min-h-0">
+        <div className="flex-grow flex flex-col">
+            <textarea
+                value={textValue}
+                onChange={onTextChange}
+                placeholder={placeholder}
+                className="w-full flex-grow p-4 border border-border-light dark:border-border-dark bg-background-light dark:bg-gray-700 rounded-lg focus:ring-2 focus:ring-ifsc-green focus:border-ifsc-green transition-shadow duration-200 resize-none text-sm leading-relaxed text-on-surface-light dark:text-on-surface-dark placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                disabled={isLoading}
+            />
+        </div>
+
 
         <div className="flex items-center space-x-3">
             <div className="flex-grow border-t border-border-light dark:border-border-dark"></div>
@@ -79,7 +75,7 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
         </div>
         
         <div 
-          className={`relative flex-grow w-full rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-center p-4 transition-colors ${isDragging ? 'bg-ifsc-green/10 border-ifsc-green' : 'hover:border-ifsc-green dark:hover:border-ifsc-green'}`}
+          className={`relative h-24 w-full rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-center p-4 transition-colors ${isDragging ? 'bg-ifsc-green/10 border-ifsc-green' : 'hover:border-ifsc-green dark:hover:border-ifsc-green'}`}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
@@ -87,7 +83,7 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
         >
           {fileValue ? (
              <div className="flex flex-col items-center justify-center text-on-surface-light dark:text-on-surface-dark">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2 text-ifsc-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-2 text-ifsc-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="font-semibold text-sm">{fileValue.name}</p>
@@ -101,7 +97,7 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
              </div>
           ) : (
             <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <p className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark text-sm">

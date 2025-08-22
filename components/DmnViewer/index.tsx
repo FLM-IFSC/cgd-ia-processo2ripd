@@ -1,3 +1,4 @@
+/*
 import React, { useEffect, useRef, useState } from 'react';
 
 // Make DmnJS available as a global type if it's loaded from a script tag
@@ -10,12 +11,14 @@ declare global {
 interface DmnViewerProps {
   xml: string;
 }
+*/
 
 /**
  * A React component to render a DMN 1.3 decision table visually using the dmn-js library.
  * It takes DMN XML as a string prop and displays it in a container, with
  * added controls for copying and downloading the XML source.
  */
+/*
 export const DmnViewer: React.FC<DmnViewerProps> = ({ xml }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
@@ -127,3 +130,6 @@ export const DmnViewer: React.FC<DmnViewerProps> = ({ xml }) => {
     </div>
   );
 };
+*/
+// Empty export to satisfy module system
+export {};

@@ -16,6 +16,22 @@ export interface AnalysisInput {
   file: File | null;
 }
 
+const IFSC_CONTEXT = `
+# INFORMAÇÕES INSTITUCIONAIS FIXAS DO IFSC (SEMPRE UTILIZAR ESTES DADOS)
+- **Controlador**:
+  - **Nome**: Instituto Federal de Educação, Ciência e Tecnologia de Santa Catarina (IFSC)
+  - **Natureza Jurídica**: Autarquia Federal
+  - **CNPJ**: 11.402.887/0001-60
+  - **Endereço**: Rua 14 de Julho, 150, Coqueiros - Florianópolis - SC
+  - **CEP**: 88075-010
+  - **Telefone**: (48) 3877-9000
+  - **Email**: gabinete.reitoria@ifsc.edu.br
+- **Encarregado pelo Tratamento de Dados Pessoais (DPO)**:
+  - **Nome**: Volnei Velleda Rodrigues
+  - **Contato**: encarregado.lgpd@ifsc.edu.br
+  - **Previsão Legal**: Art. 41 da Lei nº 13.709/2018 (LGPD)
+`;
+
 /**
  * Converts a File object to the GoogleGenerativeAI.Part format.
  * Handles standard files (images, text) and special cases like Bizagi .bpm projects.
@@ -144,7 +160,9 @@ const generateAndParse = async <T>(
 
 const getBaseContextPrompt = (description: string, existingResults: Partial<AnalysisResult>): string => `
 # CONTEXTO GERAL
-A análise é sobre um processo descrito como: "${description || 'Não fornecido'}".
+${IFSC_CONTEXT}
+
+A análise é sobre um processo do IFSC descrito como: "${description || 'Não fornecido'}".
 Os seguintes artefatos já foram gerados e devem ser usados como base para a sua tarefa. Se um artefato estiver vazio, significa que ainda não foi gerado.
 \`\`\`json
 ${JSON.stringify(existingResults, null, 2)}
@@ -153,10 +171,10 @@ ${JSON.stringify(existingResults, null, 2)}
 
 const getVisualPrompt = (): string => `
 # ROLE
-Você é um Arquiteto Mestre de Automação IA. Sua tarefa é converter uma descrição de processo (texto, imagem, ou Bizagi) em um modelo visual BPMN 2.0 e, se aplicável, um modelo de decisão DMN 1.3.
+Você é um Arquiteto Mestre de Automação IA. Sua tarefa é converter uma descrição de processo (texto, imagem, ou Bizagi) em um modelo visual BPMN 2.0.
 
 # TASK
-Analise a entrada do usuário e gere o XML para o processo visual. Sua resposta DEVE focar EXCLUSIVAMENTE na geração do BPMN e DMN.
+Analise a entrada do usuário e gere o XML para o processo visual. Sua resposta DEVE focar EXCLUSIVAMENTE na geração do BPMN. O artefato DMN não deve ser gerado.
 
 ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE BPMN (LEIA COM ATENÇÃO)
 O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A falha em seguir estas regras resultará em um diagrama que não pode ser desenhado.
@@ -172,66 +190,14 @@ O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A fa
 2. DESENHE TUDO (1 PARA 1): Para CADA elemento lógico definido na seção \`<bpmn:process>\` ou \`<bpmn:collaboration>\`, DEVE haver um elemento visual correspondente dentro do \`<bpmndi:BPMNPlane>\`.
 3. IDS CONSISTENTES: O atributo \`bpmnElement\` em cada \`BPMNShape\` e \`BPMNEdge\` DEVE corresponder ao \`id\` do elemento lógico que ele representa.
 
-### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
-Se um modelo de decisão for identificado no processo, você DEVE gerar um XML DMN 1.3 VÁLIDO.
-#### Regra 0: GERE QUANDO NECESSÁRIO
-- Se o processo contém regras de negócio, condições, ou lógicas que determinam o fluxo (ex: "Se o risco for alto, notificar gerente"), você DEVE modelar isso em um DMN.
-- Se não houver absolutamente nenhuma decisão a ser modelada, o valor para "dmn_xml" DEVE ser \`null\`. Não gere um DMN vazio.
-#### Regra 1: ESTRUTURA, NAMESPACES E CASING (A MAIS IMPORTANTE)
-- O XML DEVE começar com \`<?xml version="1.0" encoding="UTF-8"?>\`.
-- O elemento raiz DEVE ser \`<dmn:Definitions>\` (com 'D' maiúsculo). QUALQUER OUTRA COISA, como \`<dmn:definitions>\`, resultará em erro.
-- O exemplo abaixo mostra a estrutura COMPLETA, VÁLIDA e com o CASING CORRETO que você DEVE seguir. Preencha os IDs, nomes e regras conforme necessário.
-  \`\`\`xml
-  <dmn:Definitions
-      xmlns:dmn="https://www.omg.org/spec/DMN/20180521/MODEL/"
-      xmlns:dmndi="https://www.omg.org/spec/DMN/20180521/DMNDI/"
-      xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
-      xmlns:di="https://www.omg.org/spec/DMN/20180521/DI/"
-      id="Definitions_UNIQUE_ID"
-      name="DRD"
-      namespace="http://camunda.org/schema/1.0/dmn"
-      exporter="sez.iO AI"
-      exporterVersion="1.0">
-    <dmn:Decision id="Decision_ID" name="Nome da Decisao">
-      <dmn:DecisionTable id="DecisionTable_ID">
-        <dmn:input id="Input_1" label="Condicao de Entrada">
-          <dmn:inputExpression id="InputExpression_1" typeRef="string">
-            <dmn:text>variavelDeEntrada</dmn:text>
-          </dmn:inputExpression>
-        </dmn:input>
-        <dmn:output id="Output_1" label="Resultado" name="variavelDeSaida" typeRef="string" />
-        <dmn:rule id="Rule_1">
-          <dmn:inputEntry id="InputEntry_1">
-            <dmn:text>"Valor da Condição"</dmn:text>
-          </dmn:inputEntry>
-          <dmn:outputEntry id="OutputEntry_1">
-            <dmn:text>"Resultado Esperado"</dmn:text>
-          </dmn:outputEntry>
-        </dmn:rule>
-      </dmn:DecisionTable>
-    </dmn:Decision>
-    <dmndi:DMNDI>
-      <dmndi:DMNDiagram id="DMNDiagram_ID">
-        <dmndi:DMNShape id="DMNShape_Decision_ID" dmnElementRef="Decision_ID">
-          <dc:Bounds height="80" width="180" x="160" y="100" />
-        </dmndi:DMNShape>
-      </dmndi:DMNDiagram>
-    </dmndi:DMNDI>
-  </dmn:Definitions>
-  \`\`\`
-#### Regra 2: CONTEÚDO MÍNIMO LÓGICO
-- Dentro de \`<dmn:Definitions>\`, DEVE haver pelo menos um elemento \`<dmn:Decision>\`.
-- Cada \`<dmn:Decision>\` DEVE conter uma \`<dmn:DecisionTable>\`.
-- A \`<dmn:DecisionTable>\` DEVE ter pelo menos um \`<dmn:input>\`, um \`<dmn:output>\` e uma \`<dmn:rule>\`.
-#### Regra 3: CONTEÚDO VISUAL OBRIGATÓRIO (DMNDI)
-- A seção \`<dmndi:DMNDI>\` contendo um \`<dmndi:DMNDiagram>\` DEVE ser incluída para que o diagrama seja visualizado.
-- Para CADA \`<dmn:Decision>\`, DEVE haver um \`<dmndi:DMNShape>\` correspondente dentro do \`<dmndi:DMNDiagram>\`.
-- O atributo \`dmnElementRef\` no elemento \`<dmndi:DMNShape>\` DEVE ser o ID exato do \`<dmn:Decision>\` que ele representa. É PROIBIDO usar \`bpmnElement\` ou qualquer outro atributo.
+// ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
+// Comentado para desabilitar a funcionalidade DMN
+// O valor para "dmn_xml" DEVE ser \`null\`.
 
 # OUTPUT_FORMAT
-Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "processo_visual".
+Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "processo_visual". O valor da chave "dmn_xml" DEVE ser sempre \`null\`.
 {
-  "processo_visual": { "bpmn_xml": "<?xml ...>", "dmn_xml": "<?xml ...> ou null" }
+  "processo_visual": { "bpmn_xml": "<?xml ...>", "dmn_xml": null }
 }`;
 
 const getAnalysisPrompt = (description: string, results: Partial<AnalysisResult>): string => `
@@ -257,25 +223,229 @@ Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chav
 
 const getInventoryPrompt = (description: string, results: Partial<AnalysisResult>): string => `
 # ROLE
-Você é um Especialista em Conformidade LGPD.
+Você é um Especialista em Conformidade LGPD. Sua tarefa é preencher o Inventário de Dados Pessoais (IDP) para o processo descrito.
 ${getBaseContextPrompt(description, results)}
 
 # TASK
-Com base em toda a informação contextual, gere a entrada completa para o Inventário de Dados Pessoais (IDP). Seja objetivo e preencha os campos de forma estruturada.
+Com base em toda a informação contextual, gere a entrada completa para o Inventário de Dados Pessoais (IDP) seguindo RIGOROSAMENTE a estrutura JSON abaixo. Use as informações institucionais do IFSC para os campos de Controlador e Encarregado (DPO). Analise o processo para identificar operadores e preencher os demais campos. Para arrays vazios, retorne []. Para campos de texto não aplicáveis, use "Não aplicável".
 
 # OUTPUT_FORMAT
 Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "inventario_idp".
 {
-  "inventario_idp": { /* Objeto IDP completo */ }
-}`;
+  "inventario_idp": {
+    "identificacao_servico": {
+      "nome_processo": "string",
+      "id_referencia": "string (ex: 'IDP-001', se não houver, gere um)",
+      "data_criacao": "string (YYYY-MM-DD, data de hoje)",
+      "data_atualizacao": "string (YYYY-MM-DD, data de hoje)"
+    },
+    "agentes_tratamento": {
+      "controlador": {
+        "nome": "Instituto Federal de Educação, Ciência e Tecnologia de Santa Catarina (IFSC)",
+        "natureza_juridica": "Autarquia Federal",
+        "cnpj": "11.402.887/0001-60",
+        "endereco": "Rua 14 de Julho, 150, Coqueiros - Florianópolis - SC",
+        "cep": "88075-010",
+        "telefone": "(48) 3877-9000",
+        "email": "gabinete.reitoria@ifsc.edu.br"
+      },
+      "encarregado_dpo": {
+        "nome": "Volnei Velleda Rodrigues",
+        "contato": "encarregado.lgpd@ifsc.edu.br",
+        "previsao_legal": "Art. 41 da Lei nº 13.709/2018 (LGPD)"
+      },
+      "operadores": [
+        {
+          "nome": "string (Nome do Operador, ex: Google, ou 'Servidores do IFSC' para processos internos)",
+          "endereco": "string", "cep": "string", "telefone": "string", "email": "string"
+        }
+      ]
+    },
+    "fases_ciclo_vida": [
+      {
+        "operador": "string (Nome do Operador)",
+        "coleta": "boolean", "retencao": "boolean", "processamento": "boolean", "compartilhamento": "boolean", "eliminacao": "boolean"
+      }
+    ],
+    "descricao_fluxo_tratamento": {
+      "coleta": "string (Como os dados são coletados?)",
+      "armazenamento": "string (Onde e como são armazenados?)",
+      "uso": "string (Para que são usados?)",
+      "compartilhamento": "string (Com quem são compartilhados?)",
+      "eliminacao": "string (Como são eliminados?)"
+    },
+    "escopo_natureza_dados": {
+      "abrangencia_geografica": "string (ex: Nacional, Estadual)",
+      "fonte_dados": "string (ex: Titular dos dados, Fontes públicas)"
+    },
+    "finalidade_tratamento": {
+      "hipotese_tratamento": "string (ex: Execução de políticas públicas, Cumprimento de obrigação legal)",
+      "finalidade": "string (Descrição da finalidade principal do tratamento)",
+      "previsao_legal": "string (ex: Lei 11.892/2008)",
+      "resultados_pretendidos": "string (O que o titular ganha com isso?)",
+      "beneficios_esperados": "string (O que o órgão/sociedade ganha?)"
+    },
+    "categorias_dados_pessoais": [
+      {
+        "descricao": "string (ex: Nome e e-mail)",
+        "tempo_retencao": "string (ex: Indefinido, 5 anos)",
+        "fonte_retencao": "string (ex: Planilha eletrônica, Base de dados)"
+      }
+    ],
+    "categorias_dados_sensiveis": [
+       {
+        "descricao": "string (ex: Dados sobre saúde)",
+        "tempo_retencao": "string",
+        "fonte_retencao": "string"
+      }
+    ],
+    "frequencia_totalizacao": {
+      "frequencia_tratamento": "string (ex: Diário, Sob demanda, 24x7)",
+      "quantidade_dados_pessoais": "number",
+      "quantidade_dados_sensiveis": "number"
+    },
+    "categorias_titulares": {
+      "categoria": "string (ex: Pessoas, Servidores, Alunos)",
+      "descricao": "string (Detalhes sobre a categoria, ex: 'Interessados em estudar no IFSC')",
+      "trata_criancas_adolescentes": "boolean",
+      "trata_outro_grupo_vulneravel": "boolean"
+    },
+    "compartilhamento_dados": [
+      {
+        "instituicao": "string (Nome da instituição com quem os dados são compartilhados)",
+        "dados_compartilhados": "string",
+        "finalidade": "string"
+      }
+    ],
+    "medidas_seguranca": [
+      {
+        "tipo_medida": "string (ex: Controle de Acesso e Privacidade)",
+        "descricao_controles": "string (ex: Acesso somente por servidores envolvidos, autenticação em dois fatores)"
+      }
+    ],
+    "transferencia_internacional": [
+      {
+        "organizacao": "string", "pais": "string", "dados_transferidos": "string", "tipo_garantia": "string"
+      }
+    ],
+    "contratos_ti": [
+      {
+        "numero_processo": "string", "objeto_contrato": "string", "email_gestor": "string"
+      }
+    ],
+    "manter_atualizacao": {
+      "politica_atualizacao": "Este documento é 'vivo' e deve ser atualizado sempre que houver mudanças no processo de tratamento de dados.",
+      "periodicidade": "Anual ou sob demanda."
+    }
+  }
+}
+`;
 
 const getRipdPrompt = (description: string, results: Partial<AnalysisResult>): string => `
 # ROLE
-Você é um Especialista em Conformidade LGPD.
+Você é um Especialista Sênior em Conformidade e Privacidade de Dados.
+
 ${getBaseContextPrompt(description, results)}
 
 # TASK
-Avalie o risco do processo. Se o risco for 'Alto', preencha o modelo de Relatório de Impacto à Proteção de Dados (RIPD) em formato Markdown. Sua tarefa é uma transposição de dados: pegue as informações que você já analisou (lista de dados, riscos, finalidade, etc.) e insira-as nos placeholders do modelo. Não gere textos longos e descritivos do zero. Seja conciso e direto. Se o risco não for alto, retorne null.
+Sua tarefa é preencher o modelo de Relatório de Impacto à Proteção de Dados (RIPD) abaixo. Utilize as informações dos artefatos já gerados (IDP, Análise de Dados) para preencher CADA campo do modelo de forma precisa e concisa. A estrutura deve seguir o padrão de um documento formal, facilitando a cópia para publicação.
+
+1.  **Avaliação de Risco:** Primeiro, avalie o risco geral do processo. Se 'analise_dados_pessoais.dados_sensiveis_identificados' contiver QUALQUER item, ou se 'inventario_idp.categorias_titulares.trata_criancas_adolescentes' for 'true', o risco é ALTO e você DEVE gerar o relatório completo.
+2.  **Geração do Relatório:** Se o risco for alto, preencha o modelo Markdown abaixo. Caso contrário, retorne \`null\`.
+3.  **Transposição de Dados:** Preencha os placeholders (ex: {nome do processo}) com os dados exatos do JSON de contexto. Não invente informações. Se uma informação não estiver disponível, indique "Não informado".
+
+# MODELO MARKDOWN (PREENCHA ESTE MODELO)
+
+# RELATÓRIO DE IMPACTO À PROTEÇÃO DE DADOS PESSOAIS (RIPD)
+
+---
+
+## 1. Identificação do Processo de Tratamento de Dados Pessoais
+
+**Nome do Processo:** {inventario_idp.identificacao_servico.nome_processo}
+**ID de Referência:** {inventario_idp.identificacao_servico.id_referencia}
+**Descrição Breve do Processo:** {description}
+**Data de Elaboração/Última Atualização:** {inventario_idp.identificacao_servico.data_atualizacao}
+
+---
+
+## 2. Agentes de Tratamento
+
+**Controlador:**
+- **Nome:** Instituto Federal de Educação, Ciência e Tecnologia de Santa Catarina (IFSC)
+- **CNPJ:** 11.402.887/0001-60
+- **Endereço:** Rua 14 de Julho, 150, Coqueiros - Florianópolis - SC, CEP 88075-010
+- **Contato:** (48) 3877-9000, gabinete.reitoria@ifsc.edu.br
+
+**Encarregado (DPO):**
+- **Nome:** Volnei Velleda Rodrigues
+- **Contato:** encarregado.lgpd@ifsc.edu.br
+
+**Operador(es):**
+{Liste os nomes dos operadores de inventario_idp.agentes_tratamento.operadores}
+
+---
+
+## 3. Dados Pessoais Envolvidos
+
+**Categorias de Dados Pessoais:** {Liste as descrições de inventario_idp.categorias_dados_pessoais}
+**Categorias de Dados Pessoais Sensíveis:** {Liste as descrições de inventario_idp.categorias_dados_sensiveis, se houver}
+**Categorias de Titulares:** {inventario_idp.categorias_titulares.categoria} - {inventario_idp.categorias_titulares.descricao}
+**Tratamento de Dados de Crianças e Adolescentes/Grupos Vulneráveis?:**
+- **Trata dados de crianças e adolescentes:** {inventario_idp.categorias_titulares.trata_criancas_adolescentes ? 'Sim' : 'Não'}
+- **Trata dados de outro grupo vulnerável:** {inventario_idp.categorias_titulares.trata_outro_grupo_vulneravel ? 'Sim' : 'Não'}
+
+---
+
+## 4. Finalidade e Base Legal do Tratamento
+
+**Finalidade(s):** {inventario_idp.finalidade_tratamento.finalidade}
+**Base(s) Legal(is):** {inventario_idp.finalidade_tratamento.hipotese_tratamento}
+**Previsão Legal Específica:** {inventario_idp.finalidade_tratamento.previsao_legal}
+
+---
+
+## 5. Análise de Riscos e Impactos
+
+**Riscos Identificados:**
+- Vazamento, acesso não autorizado ou uso indevido de dados pessoais e, especialmente, dados pessoais sensíveis.
+- Reidentificação de titulares em conjuntos de dados, se aplicável.
+- Descumprimento de obrigações legais da LGPD.
+- Prejuízo à privacidade e aos direitos de grupos vulneráveis, se aplicável.
+
+**Impactos para os Titulares:**
+- Danos materiais e morais (e.g., discriminação, fraude, perda de controle sobre informações) em caso de violação de dados.
+
+**Impactos para o Controlador (IFSC):**
+- Danos à imagem e reputação institucional.
+- Aplicação de sanções administrativas pela ANPD.
+- Custos financeiros decorrentes de ações judiciais e remediação de incidentes.
+
+---
+
+## 6. Medidas de Salvaguarda e Mitigação de Riscos
+
+**Medidas Técnicas e Organizacionais:**
+{Liste as descrições de inventario_idp.medidas_seguranca}
+- **Governança e Conscientização:** Treinamento contínuo em LGPD e segurança da informação para servidores envolvidos.
+- **Conformidade com Princípios da LGPD:** O processo é desenhado para garantir a aderência aos princípios da LGPD.
+- **Política de Atualização:** O RIPD é um documento vivo e será atualizado anualmente ou sob demanda.
+
+---
+
+## 7. APROVAÇÃO
+
+<br><br>
+
+_________________________________________
+**<NOME DO RESPONSÁVEL PELA ELABORAÇÃO>**
+*Responsável pela Elaboração do RIPD*
+
+<br><br>
+
+_________________________________________
+**Volnei Velleda Rodrigues**
+*Encarregado pelo Tratamento de Dados Pessoais (DPO)*
 
 # OUTPUT_FORMAT
 Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "rascunho_ripd".
@@ -341,61 +511,10 @@ O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A fa
 2. DESENHE TUDO (1 PARA 1): Para CADA elemento lógico definido na seção \`<bpmn:process>\` ou \`<bpmn:collaboration>\`, DEVE haver um elemento visual correspondente dentro do \`<bpmndi:BPMNPlane>\`.
 3. IDS CONSISTENTES: O atributo \`bpmnElement\` em cada \`BPMNShape\` e \`BPMNEdge\` DEVE corresponder ao \`id\` do elemento lógico que ele representa.
 
-### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
-Se um modelo de decisão for identificado no processo, você DEVE gerar um XML DMN 1.3 VÁLIDO.
-#### Regra 0: GERE QUANDO NECESSÁRIO
-- Se o processo contém regras de negócio, condições, ou lógicas que determinam o fluxo (ex: "Se o risco for alto, notificar gerente"), você DEVE modelar isso em um DMN.
-- Se não houver absolutamente nenhuma decisão a ser modelada, o valor para "dmn_xml" DEVE ser \`null\`. Não gere um DMN vazio.
-#### Regra 1: ESTRUTURA, NAMESPACES E CASING (A MAIS IMPORTANTE)
-- O XML DEVE começar com \`<?xml version="1.0" encoding="UTF-8"?>\`.
-- O elemento raiz DEVE ser \`<dmn:Definitions>\` (com 'D' maiúsculo). QUALQUER OUTRA COISA, como \`<dmn:definitions>\`, resultará em erro.
-- O exemplo abaixo mostra a estrutura COMPLETA, VÁLIDA e com o CASING CORRETO que você DEVE seguir. Preencha os IDs, nomes e regras conforme necessário.
-  \`\`\`xml
-  <dmn:Definitions
-      xmlns:dmn="https://www.omg.org/spec/DMN/20180521/MODEL/"
-      xmlns:dmndi="https://www.omg.org/spec/DMN/20180521/DMNDI/"
-      xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
-      xmlns:di="https://www.omg.org/spec/DMN/20180521/DI/"
-      id="Definitions_UNIQUE_ID"
-      name="DRD"
-      namespace="http://camunda.org/schema/1.0/dmn"
-      exporter="sez.iO AI"
-      exporterVersion="1.0">
-    <dmn:Decision id="Decision_ID" name="Nome da Decisao">
-      <dmn:DecisionTable id="DecisionTable_ID">
-        <dmn:input id="Input_1" label="Condicao de Entrada">
-          <dmn:inputExpression id="InputExpression_1" typeRef="string">
-            <dmn:text>variavelDeEntrada</dmn:text>
-          </dmn:inputExpression>
-        </dmn:input>
-        <dmn:output id="Output_1" label="Resultado" name="variavelDeSaida" typeRef="string" />
-        <dmn:rule id="Rule_1">
-          <dmn:inputEntry id="InputEntry_1">
-            <dmn:text>"Valor da Condição"</dmn:text>
-          </dmn:inputEntry>
-          <dmn:outputEntry id="OutputEntry_1">
-            <dmn:text>"Resultado Esperado"</dmn:text>
-          </dmn:outputEntry>
-        </dmn:rule>
-      </dmn:DecisionTable>
-    </dmn:Decision>
-    <dmndi:DMNDI>
-      <dmndi:DMNDiagram id="DMNDiagram_ID">
-        <dmndi:DMNShape id="DMNShape_Decision_ID" dmnElementRef="Decision_ID">
-          <dc:Bounds height="80" width="180" x="160" y="100" />
-        </dmndi:DMNShape>
-      </dmndi:DMNDiagram>
-    </dmndi:DMNDI>
-  </dmn:Definitions>
-  \`\`\`
-#### Regra 2: CONTEÚDO MÍNIMO LÓGICO
-- Dentro de \`<dmn:Definitions>\`, DEVE haver pelo menos um elemento \`<dmn:Decision>\`.
-- Cada \`<dmn:Decision>\` DEVE conter uma \`<dmn:DecisionTable>\`.
-- A \`<dmn:DecisionTable>\` DEVE ter pelo menos um \`<dmn:input>\`, um \`<dmn:output>\` e uma \`<dmn:rule>\`.
-#### Regra 3: CONTEÚDO VISUAL OBRIGATÓRIO (DMNDI)
-- A seção \`<dmndi:DMNDI>\` contendo um \`<dmndi:DMNDiagram>\` DEVE ser incluída para que o diagrama seja visualizado.
-- Para CADA \`<dmn:Decision>\`, DEVE haver um \`<dmndi:DMNShape>\` correspondente dentro do \`<dmndi:DMNDiagram>\`.
-- O atributo \`dmnElementRef\` no elemento \`<dmndi:DMNShape>\` DEVE ser o ID exato do \`<dmn:Decision>\` que ele representa. É PROIBIDO usar \`bpmnElement\` ou qualquer outro atributo.
+// ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
+// Comentado para desabilitar a funcionalidade DMN
+// O valor para "dmn_xml" DEVE ser \`null\`.
+
 
 # JSON ANTERIOR (PARA CORRIGIR)
 \`\`\`json
