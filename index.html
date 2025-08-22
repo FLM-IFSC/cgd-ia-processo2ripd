@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23009a44' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2a10 10 0 1 0 10 10' /%3E%3Cpath d='M12 2L12 8' /%3E%3Cpath d='M12 16L12 22' /%3E%3Cpath d='M17 5L15 7' /%3E%3Cpath d='M9 7L7 5' /%3E%3Cpath d='M17 19L15 17' /%3E%3Cpath d='M9 17L7 19' /%3E%3Cpath d='M22 12L16 12' /%3E%3Cpath d='M8 12L2 12' /%3E%3Ccircle cx='12' cy='12' r='3' fill='%23009a44' /%3E%3C/svg%3E" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sez.iO | IFSC - Assistente de Modelagem de Processos e Relatórios LGPD</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- BPMN.io viewer -->
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@^17.0.2/dist/assets/bpmn-js.css">
+  <script src="https://unpkg.com/bpmn-js@^17.0.2/dist/bpmn-viewer.development.js"></script>
+  
+  <!-- DMN.io viewer -->
+  <link rel="stylesheet" href="https://unpkg.com/dmn-js@^15.0.1/dist/assets/dmn-js-decision-table.css">
+  <link rel="stylesheet" href="https://unpkg.com/dmn-js@^15.0.1/dist/assets/dmn-js-shared.css">
+  <script src="https://unpkg.com/dmn-js@^15.0.1/dist/dmn-viewer.development.js"></script>
+
+<script>
+  // Tailwind CSS Configuration
+  tailwind.config = {
+    darkMode: 'class', // Enable class-based dark mode
+    theme: {
+      extend: {
+        colors: {
+          ifsc: {
+            green: '#009a44',
+            'green-dark': '#007a36',
+          },
+          primary: {
+            DEFAULT: '#009a44',
+            dark: '#007a36'
+          },
+          background: {
+            light: '#f5f5f5',
+            dark: '#111827',
+          },
+          surface: {
+             light: '#ffffff',
+             dark: '#1f2937',
+          },
+          'on-surface': {
+            light: '#333333',
+            dark: '#e5e7eb',
+          },
+          'on-surface-secondary': {
+             light: '#6b7280',
+             dark: '#9ca3af',
+          },
+          border: {
+            light: '#e0e0e0',
+            dark: '#374151',
+          }
+        }
+      },
+      fontFamily: {
+          sans: ['Lato', 'sans-serif'],
+      }
+    }
+  }
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.15.0",
+    "marked": "https://esm.sh/marked@^14.0.0",
+    "jszip": "https://esm.sh/jszip@^3.10.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/styles/global.css">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-background-light text-on-surface-light dark:bg-background-dark dark:text-on-surface-dark transition-colors duration-200;
+  font-family: 'Lato', sans-serif;
+}
