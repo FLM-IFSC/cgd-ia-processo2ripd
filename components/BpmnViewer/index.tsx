@@ -86,45 +86,6 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml }) => {
     downloadFile(blob, 'processo.xml');
   };
 
-  // const handleDownloadBizagi = async () => {
-  //   // 1. Define the content for the required manifest files for a Bizagi project.
-  //   const modelXml = '<?xml version="1.0" encoding="utf-8"?><model />';
-  //   const extendedAttributesXml = '<?xml version="1.0" encoding="utf-8"?><extended-attributes />';
-
-  //   // 2. Modify the BPMN XML to include Bizagi-specific attributes for better compatibility.
-  //   // Using DOMParser is more robust than regex for XML manipulation.
-  //   const parser = new DOMParser();
-  //   const xmlDoc = parser.parseFromString(xml, "application/xml");
-  //   const definitions = xmlDoc.getElementsByTagName("bpmn:definitions")[0];
-  //   let bizagiCompatibleXml = xml;
-
-  //   if (definitions) {
-  //       definitions.setAttribute('xmlns:bizagi', 'http://www.bizagi.com/bpmn/extensions');
-  //       definitions.setAttribute('exporter', 'Bizagi Modeler');
-  //       definitions.setAttribute('exporterVersion', '4.2.0.003'); // A version that is known to be compatible
-  //       const serializer = new XMLSerializer();
-  //       bizagiCompatibleXml = serializer.serializeToString(xmlDoc);
-  //   } else {
-  //       console.warn("BPMN definitions tag not found; skipping Bizagi-specific modifications.");
-  //   }
-
-  //   // 3. Create a zip archive with the required project structure for a .bpm file.
-  //   const zip = new JSZip();
-  //   zip.file('model.xml', modelXml);
-  //   zip.file('extendedAttributes.xml', extendedAttributesXml);
-  //   zip.file('diagram.diag', bizagiCompatibleXml);
-
-  //   // 4. Generate the zip blob and trigger the download.
-  //   try {
-  //       const blob = await zip.generateAsync({ type: 'blob' });
-  //       downloadFile(blob, 'processo-bizagi.bpm');
-  //   } catch (err) {
-  //       console.error("Failed to generate Bizagi .bpm file:", err);
-  //       alert("Ocorreu um erro ao gerar o arquivo para o Bizagi.");
-  //   }
-  // };
-
-
   return (
     <div className="flex flex-col w-full h-full min-h-[400px] border border-border-light dark:border-border-dark rounded-lg bg-surface-light dark:bg-surface-dark overflow-hidden">
         <div className="flex justify-between items-center px-4 py-2 bg-gray-50 dark:bg-white/5 text-xs border-b border-border-light dark:border-border-dark flex-wrap gap-2">
@@ -134,9 +95,6 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml }) => {
                  <button onClick={handleDownloadBpmn} className="px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-on-surface-light dark:text-on-surface-dark">
                     BPMN.io (.bpmn)
                  </button>
-                 {/* <button onClick={handleDownloadBizagi} className="px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-on-surface-light dark:text-on-surface-dark">
-                    Bizagi (.bpm)
-                 </button> */}
                  <button onClick={handleDownloadXml} className="px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-on-surface-light dark:text-on-surface-dark">
                     XML (.xml)
                  </button>
@@ -160,7 +118,7 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml }) => {
                 </button>
             </div>
         </div>
-        <div className="flex-grow relative bg-white">
+        <div className="flex-grow relative bg-gray-50 dark:bg-gray-800/30">
             <div ref={containerRef} className="w-full h-full" style={{ visibility: status === 'success' ? 'visible' : 'hidden' }} />
             {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-500">

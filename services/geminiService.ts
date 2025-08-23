@@ -33,74 +33,45 @@ const IFSC_CONTEXT = `
 `;
 
 /**
- * Converts a File object to the GoogleGenerativeAI.Part format.
- * Handles standard files (images, text) and special cases like Bizagi .bpm projects.
- * For .bpm files, it unzips them in the browser, concatenates the content of all
- * relevant diagram (.diag) and config (.xml) files, and sends them as a single text part.
+ * Extracts text content from process files (.xpdl, .bpmn, .xml).
+ * It also sanitizes the text by removing the BOM.
  */
-const fileToGenerativePart = async (file: File): Promise<{inlineData: { mimeType: string, data: string }}> => {
-  const fileName = file.name.toLowerCase();
-
-  // Handle .bpm Bizagi project files by unzipping and concatenating content
-  if (fileName.endsWith('.bpm')) {
-    try {
-      const zip = new JSZip();
-      const content = await file.arrayBuffer();
-      const loadedZip = await zip.loadAsync(content);
-      
-      const textPromises: Promise<{ name: string, content: string }>[] = [];
-      loadedZip.forEach((_, zipEntry) => {
-        const entryName = zipEntry.name.toLowerCase();
-        if (!zipEntry.dir && (entryName.endsWith('.diag') || entryName.endsWith('.xml'))) {
-          textPromises.push(
-            zipEntry.async('string').then(content => ({ name: zipEntry.name, content }))
-          );
+const getTextContentFromFile = async (file: File): Promise<string> => {
+    const sanitize = (text: string) => {
+        // Remove Byte Order Mark if present
+        if (text.charCodeAt(0) === 0xFEFF) {
+            return text.substring(1);
         }
-      });
-      
-      const allFileContents = await Promise.all(textPromises);
+        return text;
+    };
+    
+    // Handle .xpdl, .bpmn, .xml files
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(sanitize(e.target?.result as string));
+        reader.onerror = () => reject(reader.error || new Error("File reading failed"));
+        reader.readAsText(file);
+    });
+};
 
-      if (allFileContents.length === 0) {
-        throw new Error("Nenhum arquivo de diagrama (.diag) ou de configuração (.xml) foi encontrado dentro do projeto .bpm.");
-      }
 
-      // Create a structured text block with the contents of each relevant file
-      const combinedText = "CONTEÚDO DO PROJETO BIZAGI (.bpm):\n" + allFileContents
-        .map(fileContent => `\n\n--- INÍCIO DO ARQUIVO: ${fileContent.name} ---\n\n${fileContent.content}\n\n--- FIM DO ARQUIVO: ${fileContent.name} ---`)
-        .join('');
-
-      // Base64 encode the combined UTF-8 text
-      // The btoa(unescape(encodeURIComponent(str))) pattern is a common way to handle UTF-8 strings.
-      const data = btoa(unescape(encodeURIComponent(combinedText)));
-      return { inlineData: { mimeType: 'text/plain', data } };
-
-    } catch (error) {
-      console.error("Error processing .bpm file:", error);
-      throw new Error(`Falha ao processar o arquivo de projeto Bizagi (.bpm). Certifique-se de que o arquivo não está corrompido. Detalhes: ${error instanceof Error ? error.message : String(error)}`);
-    }
+/**
+ * Converts an image File object to the GoogleGenerativeAI.Part format.
+ * Throws an error for non-image files, as they should be handled as text.
+ */
+const fileToImagePart = async (file: File): Promise<{inlineData: { mimeType: string, data: string }}> => {
+  if (!file.type.startsWith('image/')) {
+    throw new Error(`Tipo de arquivo '${file.type}' não é uma imagem. Arquivos de processo devem ser lidos como texto.`);
   }
 
-  // Original logic for other files (images, .bpmn, .xml, .diag)
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.readAsDataURL(file); // Reads as base64 data URL
+    reader.readAsDataURL(file);
     reader.onload = () => {
       try {
         const result = (reader.result as string);
         const data = result.split(',')[1];
-        
-        let mimeType = file.type;
-        
-        // Fallback for common process model files that browsers might not recognize
-        if (!mimeType && (fileName.endsWith('.bpmn') || fileName.endsWith('.xml') || fileName.endsWith('.diag'))) {
-          mimeType = 'text/xml';
-        }
-
-        if (!mimeType) {
-          throw new Error(`Não foi possível determinar o tipo MIME para "${file.name}". Verifique se o arquivo é suportado (imagem, .bpmn, .xml, .diag, .bpm).`);
-        }
-        
-        resolve({ inlineData: { mimeType, data } });
+        resolve({ inlineData: { mimeType: file.type, data } });
       } catch (e) {
         reject(e);
       }
@@ -109,24 +80,13 @@ const fileToGenerativePart = async (file: File): Promise<{inlineData: { mimeType
   });
 };
 
-const generateAndParse = async <T>(
-  prompt: string,
-  input: AnalysisInput,
-  onThinkingUpdate: (update: string) => void,
-  isInitialAnalysis: boolean = false
+/**
+ * Generic function to call the Gemini API with a streaming response and parse the JSON result.
+ */
+const streamAndParse = async <T>(
+  contents: { parts: any[] },
+  onThinkingUpdate: (update: string) => void
 ): Promise<T> => {
-  const contents: any = { parts: [] };
-
-  if (isInitialAnalysis && input.file) {
-    contents.parts.push(await fileToGenerativePart(input.file));
-  }
-  
-  contents.parts.push({ text: prompt });
-  
-  if (isInitialAnalysis && input.description) {
-     contents.parts.push({ text: `\n# CONTEXTO ADICIONAL (LINGUAGEM NATURAL)\n${input.description}` });
-  }
-
   const stream = await ai.models.generateContentStream({ model, contents });
   let accumulatedJson = '';
   for await (const chunk of stream) {
@@ -171,10 +131,10 @@ ${JSON.stringify(existingResults, null, 2)}
 
 const getVisualPrompt = (): string => `
 # ROLE
-Você é um Arquiteto Mestre de Automação IA. Sua tarefa é converter uma descrição de processo (texto, imagem, ou Bizagi) em um modelo visual BPMN 2.0.
+Você é um Arquiteto Mestre de Automação IA. Sua tarefa é converter uma descrição de processo (texto, imagem, ou conteúdo de arquivo XML/BPMN/XPDL) em um modelo visual BPMN 2.0.
 
 # TASK
-Analise a entrada do usuário e gere o XML para o processo visual. Sua resposta DEVE focar EXCLUSIVAMENTE na geração do BPMN. O artefato DMN não deve ser gerado.
+Analise a entrada do usuário (que pode incluir texto e/ou o conteúdo de um arquivo XML) e gere o XML para o processo visual. Sua resposta DEVE focar EXCLUSIVAMENTE na geração do BPMN. O artefato DMN não deve ser gerado.
 
 ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE BPMN (LEIA COM ATENÇÃO)
 O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A falha em seguir estas regras resultará em um diagrama que não pode ser desenhado.
@@ -182,7 +142,7 @@ O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A fa
 - O output DEVE começar SEMPRE com a declaração XML: \`<?xml version="1.0" encoding="UTF-8"?>\`.
 - O elemento raiz do documento DEVE ser SEMPRE \`<bpmn:definitions>\`.
 - O namespace principal do BPMN DEVE ser \`http://www.omg.org/spec/BPMN/20100524/MODEL\`.
-#### VALIDAÇÃO LÓGICA (A ESTRUTURA):
+#### VALIDAÇÃO LÓgica (A ESTRUTURA):
 1. REFERÊNCIAS COMPLETAS: Todo \`<bpmn:sequenceFlow>\` e \`<bpmn:messageFlow>\` DEVE OBRIGATÓRIO ter os atributos \`sourceRef\` e \`targetRef\` preenchidos com IDs válidos de elementos existentes no modelo. É PROIBIDO omitir qualquer um desses atributos.
 2. FLUXOS DE MENSAGEM: \`<bpmn:messageFlow>\` só pode conectar elementos em PARTICIPANTES (\`<bpmn:participant>\`) diferentes.
 #### VALIDAÇÃO VISUAL (O DESENHO - BPMNDI):
@@ -355,20 +315,16 @@ Sua tarefa é preencher o modelo de Relatório de Impacto à Proteção de Dados
 3.  **Transposição de Dados:** Preencha os placeholders (ex: {nome do processo}) com os dados exatos do JSON de contexto. Não invente informações. Se uma informação não estiver disponível, indique "Não informado".
 
 # MODELO MARKDOWN (PREENCHA ESTE MODELO)
-
 # RELATÓRIO DE IMPACTO À PROTEÇÃO DE DADOS PESSOAIS (RIPD)
-
 ---
-
 ## 1. Identificação do Processo de Tratamento de Dados Pessoais
 
-**Nome do Processo:** {inventario_idp.identificacao_servico.nome_processo}
-**ID de Referência:** {inventario_idp.identificacao_servico.id_referencia}
-**Descrição Breve do Processo:** {description}
-**Data de Elaboração/Última Atualização:** {inventario_idp.identificacao_servico.data_atualizacao}
+**Nome do Processo:** {inventario_idp.identificacao_servico.nome_processo}  
+**ID de Referência:** {inventario_idp.identificacao_servico.id_referencia}  
+**Descrição Breve do Processo:** {description}  
+**Data de Elaboração/Última Atualização:** {inventario_idp.identificacao_servico.data_atualizacao}  
 
 ---
-
 ## 2. Agentes de Tratamento
 
 **Controlador:**
@@ -385,26 +341,23 @@ Sua tarefa é preencher o modelo de Relatório de Impacto à Proteção de Dados
 {Liste os nomes dos operadores de inventario_idp.agentes_tratamento.operadores}
 
 ---
-
 ## 3. Dados Pessoais Envolvidos
 
-**Categorias de Dados Pessoais:** {Liste as descrições de inventario_idp.categorias_dados_pessoais}
-**Categorias de Dados Pessoais Sensíveis:** {Liste as descrições de inventario_idp.categorias_dados_sensiveis, se houver}
-**Categorias de Titulares:** {inventario_idp.categorias_titulares.categoria} - {inventario_idp.categorias_titulares.descricao}
+**Categorias de Dados Pessoais:** {Liste as descrições de inventario_idp.categorias_dados_pessoais}  
+**Categorias de Dados Pessoais Sensíveis:** {Liste as descrições de inventario_idp.categorias_dados_sensiveis, se houver}  
+**Categorias de Titulares:** {inventario_idp.categorias_titulares.categoria} - {inventario_idp.categorias_titulares.descricao}  
 **Tratamento de Dados de Crianças e Adolescentes/Grupos Vulneráveis?:**
 - **Trata dados de crianças e adolescentes:** {inventario_idp.categorias_titulares.trata_criancas_adolescentes ? 'Sim' : 'Não'}
 - **Trata dados de outro grupo vulnerável:** {inventario_idp.categorias_titulares.trata_outro_grupo_vulneravel ? 'Sim' : 'Não'}
 
 ---
-
 ## 4. Finalidade e Base Legal do Tratamento
 
-**Finalidade(s):** {inventario_idp.finalidade_tratamento.finalidade}
-**Base(s) Legal(is):** {inventario_idp.finalidade_tratamento.hipotese_tratamento}
-**Previsão Legal Específica:** {inventario_idp.finalidade_tratamento.previsao_legal}
+**Finalidade(s):** {inventario_idp.finalidade_tratamento.finalidade}  
+**Base(s) Legal(is):** {inventario_idp.finalidade_tratamento.hipotese_tratamento}  
+**Previsão Legal Específica:** {inventario_idp.finalidade_tratamento.previsao_legal}  
 
 ---
-
 ## 5. Análise de Riscos e Impactos
 
 **Riscos Identificados:**
@@ -422,7 +375,6 @@ Sua tarefa é preencher o modelo de Relatório de Impacto à Proteção de Dados
 - Custos financeiros decorrentes de ações judiciais e remediação de incidentes.
 
 ---
-
 ## 6. Medidas de Salvaguarda e Mitigação de Riscos
 
 **Medidas Técnicas e Organizacionais:**
@@ -432,7 +384,6 @@ Sua tarefa é preencher o modelo de Relatório de Impacto à Proteção de Dados
 - **Política de Atualização:** O RIPD é um documento vivo e será atualizado anualmente ou sob demanda.
 
 ---
-
 ## 7. APROVAÇÃO
 
 <br><br>
@@ -446,7 +397,6 @@ _________________________________________
 _________________________________________
 **Volnei Velleda Rodrigues**
 *Encarregado pelo Tratamento de Dados Pessoais (DPO)*
-
 # OUTPUT_FORMAT
 Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "rascunho_ripd".
 {
@@ -503,7 +453,7 @@ O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A fa
 - O output DEVE começar SEMPRE com a declaração XML: \`<?xml version="1.0" encoding="UTF-8"?>\`.
 - O elemento raiz do documento DEVE ser SEMPRE \`<bpmn:definitions>\`.
 - O namespace principal do BPMN DEVE ser \`http://www.omg.org/spec/BPMN/20100524/MODEL\`.
-#### VALIDAÇÃO LÓGICA (A ESTRUTURA):
+#### VALIDAÇÃO LÓgica (A ESTRUTURA):
 1. REFERÊNCIAS COMPLETAS: Todo \`<bpmn:sequenceFlow>\` e \`<bpmn:messageFlow>\` DEVE OBRIGATÓRIO ter os atributos \`sourceRef\` e \`targetRef\` preenchidos com IDs válidos de elementos existentes no modelo. É PROIBIDO omitir qualquer um desses atributos.
 2. FLUXOS DE MENSAGEM: \`<bpmn:messageFlow>\` só pode conectar elementos em PARTICIPANTES (\`<bpmn:participant>\`) diferentes.
 #### VALIDAÇÃO VISUAL (O DESENHO - BPMNDI):
@@ -532,32 +482,59 @@ Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido, com a estrutur
 
 export const generateVisual = async (input: AnalysisInput, onThinkingUpdate: (update: string) => void): Promise<{ processo_visual: ProcessoVisual }> => {
     const prompt = getVisualPrompt();
-    return generateAndParse(prompt, input, onThinkingUpdate, true);
+    const parts: any[] = [];
+    const textBasedExtensions = ['.xpdl', '.bpmn', '.xml'];
+
+    let finalPrompt = prompt;
+
+    if (input.file) {
+        const fileName = input.file.name.toLowerCase();
+        const isTextBased = textBasedExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (isTextBased) {
+            const fileContent = await getTextContentFromFile(input.file);
+            finalPrompt = `${prompt}\n\n# CONTEÚDO DO ARQUIVO FORNECIDO (${fileName}):\n\`\`\`xml\n${fileContent}\n\`\`\``;
+        } else {
+            parts.push(await fileToImagePart(input.file));
+        }
+    }
+
+    if (input.description) {
+        finalPrompt += `\n\n# CONTEXTO ADICIONAL (LINGUAGEM NATURAL)\n${input.description}`;
+    }
+    
+    parts.push({ text: finalPrompt });
+
+    return streamAndParse({ parts }, onThinkingUpdate);
+};
+
+const createStandardParts = (prompt: string): any[] => {
+    return [{ text: prompt }];
 };
 
 export const generateDataAnalysis = async (input: AnalysisInput, results: Partial<AnalysisResult>, onThinkingUpdate: (update: string) => void): Promise<{ analise_dados_pessoais: AnaliseDadosPessoais }> => {
     const prompt = getAnalysisPrompt(input.description, results);
-    return generateAndParse(prompt, input, onThinkingUpdate);
+    return streamAndParse({ parts: createStandardParts(prompt) }, onThinkingUpdate);
 };
 
 export const generateInventory = async (input: AnalysisInput, results: Partial<AnalysisResult>, onThinkingUpdate: (update: string) => void): Promise<{ inventario_idp: InventarioIDP }> => {
     const prompt = getInventoryPrompt(input.description, results);
-    return generateAndParse(prompt, input, onThinkingUpdate);
+    return streamAndParse({ parts: createStandardParts(prompt) }, onThinkingUpdate);
 };
 
 export const generateRipd = async (input: AnalysisInput, results: Partial<AnalysisResult>, onThinkingUpdate: (update: string) => void): Promise<{ rascunho_ripd: RascunhoRIPD }> => {
     const prompt = getRipdPrompt(input.description, results);
-    return generateAndParse(prompt, input, onThinkingUpdate);
+    return streamAndParse({ parts: createStandardParts(prompt) }, onThinkingUpdate);
 };
 
 export const generateSuggestions = async (input: AnalysisInput, results: Partial<AnalysisResult>, onThinkingUpdate: (update: string) => void): Promise<{ sugestoes_automacao: SugestoesAutomacao }> => {
     const prompt = getSuggestionsPrompt(input.description, results);
-    return generateAndParse(prompt, input, onThinkingUpdate);
+    return streamAndParse({ parts: createStandardParts(prompt) }, onThinkingUpdate);
 };
 
 export const generateLog = async (input: AnalysisInput, results: Partial<AnalysisResult>, onThinkingUpdate: (update: string) => void): Promise<{ log_analise: LogAnalise }> => {
     const prompt = getLogPrompt(input.description, results);
-    return generateAndParse(prompt, input, onThinkingUpdate);
+    return streamAndParse({ parts: createStandardParts(prompt) }, onThinkingUpdate);
 };
 
 
@@ -568,7 +545,7 @@ export const refineProcess = async (
 ): Promise<AnalysisResult> => {
    try {
     const fullPrompt = getRefinePrompt(previousAnalysis, correction);
-    return await generateAndParse(fullPrompt, { description: '', file: null }, onThinkingUpdate);
+    return await streamAndParse({ parts: createStandardParts(fullPrompt) }, onThinkingUpdate);
   } catch (error) {
     console.error("Error calling Gemini API for refinement:", error);
     throw error instanceof Error ? error : new Error("Falha ao refinar a análise.");

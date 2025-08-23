@@ -54,7 +54,7 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
       <div className="mb-1">
         <h2 className="text-xl font-semibold text-on-surface-light dark:text-on-surface-dark">1. Forneça o Processo</h2>
       </div>
-      <p className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-4">Descreva em linguagem natural e/ou envie um arquivo (imagem, .bpmn, .xml, e projetos .bpm/.diag do Bizagi).</p>
+       <p className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-4">Descreva em linguagem natural o processo passo a passo:</p>
       
       <div className="flex flex-col space-y-4 flex-grow min-h-0">
         <div className="flex-grow flex flex-col">
@@ -73,6 +73,10 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
             <span className="text-gray-500 text-xs font-semibold">E/OU</span>
             <div className="flex-grow border-t border-border-light dark:border-border-dark"></div>
         </div>
+
+        <p className="text-sm text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark -my-2">
+          Envie um arquivo de processo: imagem, .bpmn, .xml, ou .xpdl (exportação do Bizagi).
+        </p>
         
         <div 
           className={`relative h-24 w-full rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-center p-4 transition-colors ${isDragging ? 'bg-ifsc-green/10 border-ifsc-green' : 'hover:border-ifsc-green dark:hover:border-ifsc-green'}`}
@@ -108,7 +112,7 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
                     className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
                     onChange={handleFileSelect}
                     disabled={isLoading}
-                    accept="image/*,.bpmn,.xml,.diag,.bpm"
+                    accept="image/*,.bpmn,.xml,.xpdl"
                 />
             </>
           )}

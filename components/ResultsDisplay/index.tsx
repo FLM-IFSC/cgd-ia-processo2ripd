@@ -150,9 +150,24 @@ const RipdView: React.FC<{ markdown: RascunhoRIPD }> = ({ markdown }) => {
         <div className="text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark py-10">O Rascunho do RIPD não foi gerado pois o processo foi classificado como de baixo/médio risco.</div>
       );
     }
-    const html = marked(markdown);
-    return <div className="p-4 border border-border-light dark:border-border-dark rounded-lg bg-white dark:bg-gray-800/50"><div className="prose prose-sm max-w-none dark:prose-invert prose-p:text-gray-600 dark:prose-p:text-gray-300" dangerouslySetInnerHTML={{ __html: html }} /></div>;
+    const html = marked(markdown, { gfm: true, breaks: true });
+    return (
+      <div className="bg-background-light dark:bg-background-dark p-2 rounded-lg">
+        <div className="bg-white dark:bg-gray-900 shadow-lg rounded-md p-6 sm:p-8 max-w-4xl mx-auto">
+          <div 
+            className="prose prose-sm max-w-none dark:prose-invert 
+                       prose-h1:text-xl prose-h1:mb-2 prose-h1:text-center
+                       prose-h2:text-lg prose-h2:mt-6 prose-h2:mb-3 prose-h2:border-b prose-h2:pb-2 prose-h2:border-border-light dark:prose-h2:border-border-dark
+                       prose-hr:my-8
+                       prose-p:my-2 prose-p:leading-relaxed
+                       prose-strong:text-on-surface-light dark:prose-strong:text-on-surface-dark"
+            dangerouslySetInnerHTML={{ __html: html }} 
+          />
+        </div>
+      </div>
+    );
 };
+
 
 const SugestoesView: React.FC<{ suggestions: SugestoesAutomacao }> = ({ suggestions }) => (
     <div className="space-y-3">
