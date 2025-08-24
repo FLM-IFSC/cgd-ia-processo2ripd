@@ -12,7 +12,8 @@ interface BpmnViewerProps {
   xml: string;
 }
 
-const BPMN_IO_LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1My4yIDIwLjMiPjxwYXRoIGZpbGw9IiMyMTIxMjEiIGQ9Ik01LjEgMTIuM3YtNi42bC0yLjQgMi4xLTEuMS0xLjNMNy43IDNoMS4ydjkuM0g1LjF6bTguNi0zLjNjMC0xLjIuMy0yLjIuOS0yLjkuNi0uNyAxLjUtMS4xIDIuNy0xLjFzMi4xLjQgMi43IDEuMWMuNi43LjkgMS43LjkgMi45cy0uMyAyLjItLjkgMi45Yy0uNi43LTEuNSAxLjEtMi43IDEuMXMtMi4xLS40LTIuNy0xLjEyLS42LS43LS45LTEuNy0uOS0yLjl6bTEuOCAwYzAgLjguMiAxLjQuNSAxLjguNC40LjkuNiAxLjUuNnMxLjEtLjIgMS41LS42Yy4zLS40LjUtMSAuNS0xLjhíLS4yLTEuNC0uNS0xLjhjLS40LS40LS45LS42LTEuNS0uNnMtMS4xLjItMS41LjZjLS4zLjQtLjUgMS0uNSAxLjh6bTExLjIgMy4zVjNoNC4xYzEuMiAwIDIuMS4zIDIuOC44LjcuNiAxIDEuNCAxIDIuNSAwIC45LS4yIDEuNi0uNyAyLjJjLS41LjUtMS4yLjgtMi4xLjhoLTIuNHYzLjFoLTIuN3ptMi43LTQuMWgxLjNjLjcgMCAxLjItLjIgMS41LS41LjMtLjMuNS0uNy41LTEuMnMtLjItLjktLjUtMS4yYy0uMy0uMy0uOC0uNS0xLjUtLjVoLTEuM3YzLjR6bTEwLjctNS4zaDEuOHY5LjNoLTEuOFYzem01LjggOS4zaDEuOFY0LjJsMy41IDguMWgxLjdsMy41LTguMXY4LjFoMS44VjNoLTIuOWwtMi42IDYtMi42LTZoLTIuOXY5LjN6TTM3LjkgMTIuM1YzaDEuOHY5LjNoLTEuOHptNi41LTQuN2MwLTEuMi4zLTIuMi45LTIuOS42LS43IDEuNS0xLjEgMi43LTEuMXMyLjEuNCAyLjcgMS4xYy42LjcuOSAxLjcuOSAyLjlzLS4zIDIuMi0uOSAyLjljLS42LjctMS41IDEuMS0yLjcgMS4xcy0yLjEtLjQtMi43LTEuMWMtLjYtLjctLjktMS43LS45LTIuOXptMS44IDBjMCAuOC4yIDEuNC41IDEuOC40LjQuOS42IDEuNS42czEuMS0uMiAxLjUtLjZjLjMtLjQuNS0xIC41LTEuOHMtLjItMS44LS41LTEuOGMtLjQtLjQtLjktLjYtMS41LS42cy0xLjEuMi0xLjUtLjZjLS4zLjQtLjUgMS0uNSAxLjh6Ij48L3BhdGg+PC9zdmc+';
+const BPMN_IO_LOGO_BASE64_LIGHT = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1My4yIDIwLjMiPjxwYXRoIGZpbGw9IiMyMTIxMjEiIGQ9Ik01LjEgMTIuM3YtNi42bC0yLjQgMi4xLTEuMS0xLjNMNy43IDNoMS4ydjkuM0g1LjF6bTguNi0zLjNjMC0xLjIuMy0yLjIuOS0yLjkuNi0uNyAxLjUtMS4xIDIuNy0xLjFzMi4xLjQgMi43IDEuMWMuNi43LjkgMS43LjkgMi45cy0uMyAyLjItLjkgMi45Yy0uNi43LTEuNSAxLjEtMi43IDEuMXMtMi4xLS40LTIuNy0xLjFjLS42LS43LS45LTEuNy0uOS0yLjl6bTEuOCAwYzAgLjguMiAxLjQuNSAxLjguNC40LjkuNiAxLjUuNnMxLjEtLjIgMS41LS42Yy4zLS40LjUtMSAuNS0xLjhíLS4yLTEuOC0uNS0xLjhjLS40LS40LS45LS42LTEuNS0uNnMtMS4xLjItMS41LS42Yy0uMy40LS41IDEtLjUgMS44em0xMS4yIDMuM1YzaDQuMWMxLjIgMCAyLjEuMyAyLjguOC43LjYgMSAxLjQgMSAyLjUgMCAuOS0uMiAxLjYtLjcgMi4yYy0uNS41LTEuMi44LTIuMS44aC0yLjR2My4xaC0yLjd6bTIuNy00LjFoMS4zYzEuMiAwIDEuMi0uMiAxLjUtLjUuMy0uMy41LS43LjUtMS4ycy0uMi0uOS0uNS0xLjJjLS4zLS4zLS44LS41LTEuNS0uNWgtMS4zdjMuNHptMTAuNy01LjNoMS44djkuM2gtMS44VjN6bTUuOCA5LjNoMS44VjQuMmwyLjUgOC4xaDEuN2wzLjUtOC4xdjguMWgxLjhWM2gtMi45bC0yLjYgNi0yLjYtNmgtMi45djkuM3pNMzcuOSAxMi4zVjNoMS44djkuM2gtMS44em02LjUtNC43YzAtMS4yLjMtMi4yLjktMi45LjYtLjcgMS41LTEuMSAyLjctMS4xczIuMS40IDIuNyAxLjFjLjYuNy45IDEuNy45IDIuOXMtLjMgMi4yLS45IDIuOWMtLjYuNy0xLjUgMS4xLTIuNyAxLjFzLTIuMS0uNC0yLjctMS4xYy0uNi0uNy0uOS0xLjctLjktMi45em0xLjggMGMwIC44LjIgMS40LjUgMS44LjQuNC45LjYgMS41LjZzMS4xLS4yIDEuNS0uNmMuMy0uNC41LTEgLjUtMS44cy0uMi0xLjgtLjUtMS44Yy0uNC0uNC0uOS0uNi0xLjUtLjZzLTEuMS4yLTEuNS0uNmMtLjMuNC0uNSAxLS41IDEuOHoiLz48L3N2Zz4=';
+const BPMN_IO_LOGO_BASE64_DARK = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1My4yIDIwLjMiPjxwYXRoIGZpbGw9IiNGRkZGRkYiIGQ9Ik01LjEgMTIuM3YtNi42bC0yLjQgMi4xLTEuMS0xLjNMNy43IDNoMS4ydjkuM0g1LjF6bTguNi0zLjNjMC0xLjIuMy0yLjIuOS0yLjkuNi0uNyAxLjUtMS4xIDIuNy0xLjFzMi4xLjQgMi43IDEuMWMuNi43LjkgMS43LjkgMi45cy0uMyAyLjItLjkgMi45Yy0uNi43LTEuNSAxLjEtMi43IDEuMXMtMi4xLS40LTIuNy0xLjFjLS42LS43LS45LTEuNy0uOS0yLjl6bTEuOCAwYzAgLjguMiAxLjQuNSAxLjguNC40LjkuNiAxLjUuNnMxLjEtLjIgMS41LS42Yy4zLS40LjUtMSAuNS0xLjhíLS4yLTEuOC0uNS0xLjhjLS40LS40LS45LS42LTEuNS0uNnMtMS4xLjItMS41LS42Yy0uMy40LS41IDEtLjUgMS44em0xMS4yIDMuM1YzaDQuMWMxLjIgMCAyLjEuMyAyLjguOC43LjYgMSAxLjQgMSAyLjUgMCAuOS0uMiAxLjYtLjcgMi4yYy0uNS41LTEuMi44LTIuMS44aC0yLjR2My4xaC0yLjd6bTIuNy00LjFoMS4zYzEuMiAwIDEuMi0uMiAxLjUtLjUuMy0uMy41LS43LjUtMS4ycy0uMi0uOS0uNS0xLjJjLS4zLS4zLS44LS41LTEuNS0uNWgtMS4zdjMuNHptMTAuNy01LjNoMS44djkuM2gtMS44VjN6bTUuOCA5LjNoMS44VjQuMmwyLjUgOC4xaDEuN2wzLjUtOC4xdjguMWgxLjhWM2gtMi45bC0yLjYgNi0yLjYtNmgtMi45djkuM3pNMzcuOSAxMi4zVjNoMS44djkuM2gtMS44em02LjUtNC43YzAtMS4yLjMtMi4yLjktMi45LjYtLjcgMS41LTEuMSAyLjctMS4xczIuMS40IDIuNyAxLjFjLjYuNy45IDEuNy45IDIuOXMtLjMgMi4yLS45IDIuOWMtLjYuNy0xLjUgMS4xLTIuNyAxLjFzLTIuMS0uNC0yLjctMS4xYy0uNi0uNy0uOS0xLjctLjktMi45em0xLjggMGMwIC44LjIgMS40LjUgMS44LjQuNC45LjYgMS41LjZzMS4xLS4yIDEuNS0uNmMuMy0uNC41LTEgLjUtMS44cy0uMi0xLjgtLjUtMS44Yy0uNC0uNC0uOS0uNi0xLjEtLjZzLTEuMS4yLTEuNS0uNmMtLjMuNC0uNSAxLS41IDEuOHoiLz48L3N2Zz4=';
 
 /**
  * A React component to render a BPMN 2.0 diagram using the bpmn-js library.
@@ -118,7 +119,7 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml }) => {
                 </button>
             </div>
         </div>
-        <div className="flex-grow relative bg-gray-50 dark:bg-gray-800/30">
+        <div className="flex-grow relative bg-white">
             <div ref={containerRef} className="w-full h-full" style={{ visibility: status === 'success' ? 'visible' : 'hidden' }} />
             {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-500">
@@ -145,7 +146,8 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml }) => {
                     title="Validar e editar no bpmn.io"
                     className="absolute bottom-3 right-3 z-10 opacity-40 hover:opacity-100 transition-opacity"
                 >
-                    <img src={BPMN_IO_LOGO_BASE64} alt="Powered by bpmn.io" className="h-5" />
+                    <img src={BPMN_IO_LOGO_BASE64_LIGHT} alt="Powered by bpmn.io" className="h-5 block dark:hidden" />
+                    <img src={BPMN_IO_LOGO_BASE64_DARK} alt="Powered by bpmn.io" className="h-5 hidden dark:block" />
                 </a>
             )}
         </div>

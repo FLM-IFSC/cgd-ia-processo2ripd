@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, IStylesOptions } from 'docx';
 import { AnalysisResult, AnaliseDadosPessoais, DadosPessoaisItem, InventarioIDP, RascunhoRIPD, SugestoesAutomacao, LogAnalise } from '../../types/index';
 import { BpmnViewer } from '../BpmnViewer/index';
-// import { DmnViewer } from '../DmnViewer/index';
+import { DmnViewer } from '../DmnViewer/index';
 
 type ArtifactKey = keyof AnalysisResult;
-type Tab = 'visual' | 'analise' | 'inventario' | 'ripd' | 'sugestoes' | 'log';
+type Tab = 'visual' | 'decisao' | 'analise' | 'inventario' | 'ripd' | 'sugestoes' | 'log';
 
 const artifactTabMap: Record<Tab, ArtifactKey | null> = {
     visual: 'processo_visual',
+    decisao: 'processo_visual',
     analise: 'analise_dados_pessoais',
     inventario: 'inventario_idp',
     ripd: 'rascunho_ripd',
@@ -27,6 +29,19 @@ interface ResultsDisplayProps {
     errorStatus: Partial<Record<ArtifactKey, string | null>>;
     thinkingLogs: Partial<Record<ArtifactKey | 'refining', string[]>>;
 }
+
+// --- Helper Functions ---
+
+const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
 
 // --- Reusable Components for Views ---
 
@@ -173,8 +188,8 @@ const SugestoesView: React.FC<{ suggestions: SugestoesAutomacao }> = ({ suggesti
     <div className="space-y-3">
         {suggestions.map((suggestion, index) => (
             <div key={index} className="flex items-start p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-border-light dark:border-border-dark">
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3 text-ifsc-green flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3 text-ifsc-green flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 S0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
                 <p className="text-sm text-on-surface-light dark:text-on-surface-dark">{suggestion}</p>
             </div>
@@ -231,6 +246,109 @@ const ErrorComponent: React.FC<{message: string}> = ({ message }) => (
 export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
   const { results, correctionText, onCorrectionTextChange, onRefine, isRefining, onGenerateArtifact, generatingStatus, errorStatus, thinkingLogs } = props;
   const [activeTab, setActiveTab] = useState<Tab>('visual');
+  const [isExporting, setIsExporting] = useState<Partial<Record<'csv' | 'docx', boolean>>>({});
+
+  const handleExportCsv = async () => {
+    if (!results.inventario_idp) return;
+    setIsExporting(prev => ({ ...prev, csv: true }));
+    try {
+        const data = results.inventario_idp;
+        const processName = data.identificacao_servico.nome_processo.replace(/[^a-z0-9]/gi, '_');
+        
+        const rows: string[][] = [["Chave", "Valor"]];
+        const flattenObject = (obj: any, prefix = '') => {
+            Object.keys(obj).forEach(key => {
+                const value = obj[key];
+                const newKey = prefix ? `${prefix} > ${formatKey(key)}` : formatKey(key);
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    flattenObject(value, newKey);
+                } else if (Array.isArray(value)) {
+                     if(value.length === 0) {
+                        rows.push([newKey, "Nenhum item"]);
+                     } else {
+                        value.forEach((item, index) => {
+                           if (typeof item === 'object') {
+                             flattenObject(item, `${newKey} [${index + 1}]`);
+                           } else {
+                             rows.push([`${newKey} [${index + 1}]`, String(item)]);
+                           }
+                        });
+                     }
+                } else {
+                    rows.push([newKey, String(value)]);
+                }
+            });
+        };
+        flattenObject(data);
+
+        let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+        csvContent += rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, `IDP_${processName}.csv`);
+
+    } catch (error) {
+        console.error("Failed to export CSV", error);
+        alert("Ocorreu um erro ao exportar o arquivo CSV.");
+    } finally {
+        setIsExporting(prev => ({ ...prev, csv: false }));
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (!results.rascunho_ripd) return;
+    setIsExporting(prev => ({ ...prev, docx: true }));
+
+    try {
+        const markdown = results.rascunho_ripd;
+        const processName = results.inventario_idp?.identificacao_servico.nome_processo.replace(/[^a-z0-9]/gi, '_') || 'RIPD';
+        
+        const styles: IStylesOptions = {
+            default: {
+                document: {
+                    run: { font: "Arial", size: 24, color: "000000" }, // 12pt
+                },
+            },
+            paragraphStyles: [
+                { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", run: { size: 32, bold: true, color: "000000" }, }, // 16pt
+                { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", run: { size: 28, bold: true, color: "000000" }, }, // 14pt
+            ],
+        };
+
+        const children: Paragraph[] = [];
+        const lines = markdown.replace(/<br>/g, '\n').split('\n');
+
+        lines.forEach(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('# ')) {
+                children.push(new Paragraph({ text: trimmedLine.substring(2), heading: HeadingLevel.HEADING_1, style: "Heading1" }));
+            } else if (trimmedLine.startsWith('## ')) {
+                children.push(new Paragraph({ text: trimmedLine.substring(3), heading: HeadingLevel.HEADING_2, style: "Heading2" }));
+            } else if (trimmedLine === '---') {
+                children.push(new Paragraph({ border: { bottom: { color: "auto", space: 1, style: BorderStyle.SINGLE, size: 6 } } }));
+            } else if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+                const text = trimmedLine.substring(2, trimmedLine.length - 2);
+                children.push(new Paragraph({ children: [new TextRun({ text, bold: true })]}));
+            } else {
+                children.push(new Paragraph({ text: trimmedLine }));
+            }
+        });
+        
+        const doc = new Document({
+            styles,
+            sections: [{ children }]
+        });
+        
+        const blob = await Packer.toBlob(doc);
+        downloadBlob(blob, `RIPD_${processName}.docx`);
+
+    } catch (error) {
+        console.error("Failed to export DOCX", error);
+        alert("Ocorreu um erro ao exportar o arquivo DOCX.");
+    } finally {
+        setIsExporting(prev => ({ ...prev, docx: false }));
+    }
+  };
   
   const handleTabClick = (tabId: Tab) => {
     setActiveTab(tabId);
@@ -253,21 +371,65 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
         }
     }
 
+    const ExportButton: React.FC<{ type: 'csv' | 'docx', onClick: () => void, text: string }> = ({ type, onClick, text }) => (
+        <div className="flex justify-end mb-4">
+            <button
+                onClick={onClick}
+                disabled={isExporting[type]}
+                className="bg-gray-200 dark:bg-gray-700 text-on-surface-light dark:text-on-surface-dark text-xs font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-wait transition-colors flex items-center"
+            >
+            {isExporting[type] ? (
+                 <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    Exportando...
+                 </>
+            ) : (
+                <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    {text}
+                </>
+            )}
+            </button>
+        </div>
+    );
+
     switch (activeTab) {
       case 'visual':
         if (!results.processo_visual) return null;
-        return (
-            <div className="space-y-6">
-                {results.processo_visual.bpmn_xml && <BpmnViewer xml={results.processo_visual.bpmn_xml} />}
-                {/* {results.processo_visual.dmn_xml && <DmnViewer xml={results.processo_visual.dmn_xml} />} */}
-            </div>
+        return <BpmnViewer xml={results.processo_visual.bpmn_xml} />;
+      case 'decisao':
+        if (!results.processo_visual) return null;
+        return results.processo_visual.dmn_xml ? (
+          <DmnViewer xml={results.processo_visual.dmn_xml} />
+        ) : (
+          <div className="flex-grow flex flex-col items-center justify-center text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark p-4 min-h-[300px]">
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-md font-semibold">Nenhuma Tabela de Decisão Gerada</h3>
+            <p className="mt-1 text-sm max-w-sm">A IA não identificou um ponto de decisão explícito baseado em regras no processo descrito.</p>
+          </div>
         );
       case 'analise':
         return results.analise_dados_pessoais ? <AnaliseView data={results.analise_dados_pessoais} /> : null;
       case 'inventario':
-        return results.inventario_idp ? <InventarioView data={results.inventario_idp} /> : null;
+        if (!results.inventario_idp) return null;
+        return (
+            <>
+                <ExportButton type="csv" onClick={handleExportCsv} text="Exportar para Planilha (.csv)" />
+                <InventarioView data={results.inventario_idp} />
+            </>
+        );
       case 'ripd':
-        return results.hasOwnProperty('rascunho_ripd') ? <RipdView markdown={results.rascunho_ripd!} /> : null;
+        if (!results.hasOwnProperty('rascunho_ripd')) return null;
+        return (
+            <>
+               {results.rascunho_ripd && <ExportButton type="docx" onClick={handleExportDocx} text="Exportar para Documento (.docx)" />}
+               <RipdView markdown={results.rascunho_ripd!} />
+            </>
+        );
       case 'sugestoes':
         return results.sugestoes_automacao ? <SugestoesView suggestions={results.sugestoes_automacao} /> : null;
       case 'log':
@@ -277,6 +439,7 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
     }
   };
   
+  const isDecisaoDisabled = !results.processo_visual;
   const isAnaliseDisabled = !results.processo_visual;
   const isInventarioDisabled = !results.analise_dados_pessoais;
   const isRipdDisabled = !results.inventario_idp;
@@ -309,7 +472,9 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
         <h2 className="text-xl font-semibold text-on-surface-light dark:text-on-surface-dark mb-4">2. Artefatos Gerados</h2>
         <div className="border-b border-border-light dark:border-border-dark mb-4">
           <nav className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-2 -mb-px" aria-label="Tabs">
-            <TabButton tabId="visual">Processo</TabButton>
+            <TabButton tabId="visual">Processo (BPMN)</TabButton>
+            <Arrow disabled={isDecisaoDisabled} />
+            <TabButton tabId="decisao" disabled={isDecisaoDisabled}>Decisão (DMN)</TabButton>
             <Arrow disabled={isAnaliseDisabled} />
             <TabButton tabId="analise" disabled={isAnaliseDisabled}>Dados Pessoais</TabButton>
             <Arrow disabled={isInventarioDisabled} />

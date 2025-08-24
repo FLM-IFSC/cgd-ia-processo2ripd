@@ -129,35 +129,67 @@ ${JSON.stringify(existingResults, null, 2)}
 \`\`\`
 `;
 
-const getVisualPrompt = (): string => `
+export const getVisualPrompt = (): string => `
 # ROLE
-Você é um Arquiteto Mestre de Automação IA. Sua tarefa é converter uma descrição de processo (texto, imagem, ou conteúdo de arquivo XML/BPMN/XPDL) em um modelo visual BPMN 2.0.
+Você é um Arquiteto Mestre de Automação e Especialista em Padrões da OMG, focado na geração de artefatos BPMN 2.0 e DMN 1.3 perfeitamente formatados e válidos.
 
 # TASK
-Analise a entrada do usuário (que pode incluir texto e/ou o conteúdo de um arquivo XML) e gere o XML para o processo visual. Sua resposta DEVE focar EXCLUSIVAMENTE na geração do BPMN. O artefato DMN não deve ser gerado.
+Analise a entrada do usuário (texto, imagem, XML) e gere um objeto JSON contendo dois artefatos: "bpmn_xml" e "dmn_xml".
+
+---
+## PARTE 1: Geração de XML BPMN 2.0
+
+Sua primeira tarefa é converter a descrição do processo em um modelo visual BPMN 2.0.
 
 ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE BPMN (LEIA COM ATENÇÃO)
 O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A falha em seguir estas regras resultará em um diagrama que não pode ser desenhado.
+
 #### Regra 0: DOCUMENTO BEM FORMADO (A MAIS IMPORTANTE)
 - O output DEVE começar SEMPRE com a declaração XML: \`<?xml version="1.0" encoding="UTF-8"?>\`.
 - O elemento raiz do documento DEVE ser SEMPRE \`<bpmn:definitions>\`.
 - O namespace principal do BPMN DEVE ser \`http://www.omg.org/spec/BPMN/20100524/MODEL\`.
-#### VALIDAÇÃO LÓgica (A ESTRUTURA):
-1. REFERÊNCIAS COMPLETAS: Todo \`<bpmn:sequenceFlow>\` e \`<bpmn:messageFlow>\` DEVE OBRIGATÓRIO ter os atributos \`sourceRef\` e \`targetRef\` preenchidos com IDs válidos de elementos existentes no modelo. É PROIBIDO omitir qualquer um desses atributos.
-2. FLUXOS DE MENSAGEM: \`<bpmn:messageFlow>\` só pode conectar elementos em PARTICIPANTES (\`<bpmn:participant>\`) diferentes.
-#### VALIDAÇÃO VISUAL (O DESENHO - BPMNDI):
-1. SEÇÃO BPMNDI OBRIGATÓRIA: A seção completa \`<bpmndi:BPMNDiagram>\` com um \`<bpmndi:BPMNPlane>\` é OBRIGATÓRIA.
-2. DESENHE TUDO (1 PARA 1): Para CADA elemento lógico definido na seção \`<bpmn:process>\` ou \`<bpmn:collaboration>\`, DEVE haver um elemento visual correspondente dentro do \`<bpmndi:BPMNPlane>\`.
-3. IDS CONSISTENTES: O atributo \`bpmnElement\` em cada \`BPMNShape\` e \`BPMNEdge\` DEVE corresponder ao \`id\` do elemento lógico que ele representa.
 
-// ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
-// Comentado para desabilitar a funcionalidade DMN
-// O valor para "dmn_xml" DEVE ser \`null\`.
+#### Regra 1: VALIDAÇÃO LÓGICA (A ESTRUTURA)
+- **REFERÊNCIAS COMPLETAS (ABSOLUTAMENTE OBRIGATÓRIO)**: CADA \`<bpmn:sequenceFlow>\` e CADA \`<bpmn:messageFlow>\` DEVE OBRIGATORIAMENTE ter os atributos \`sourceRef\` e \`targetRef\` preenchidos. Os valores para estes atributos DEVEM ser IDs válidos de elementos existentes no modelo. É ESTRITAMENTE PROIBIDO omitir \`sourceRef\` ou \`targetRef\`. A ausência de qualquer um deles é um erro fatal.
+- **FLUXOS DE MENSAGEM**: \`<bpmn:messageFlow>\` só pode conectar elementos em PARTICIPANTES (\`<bpmn:participant>\`) diferentes.
 
-# OUTPUT_FORMAT
-Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "processo_visual". O valor da chave "dmn_xml" DEVE ser sempre \`null\`.
+#### Regra 2: VALIDAÇÃO VISUAL (O DESENHO - BPMNDI)
+- **SEÇÃO BPMNDI OBRIGATÓRIA**: A seção completa \`<bpmndi:BPMNDiagram>\` com um \`<bpmndi:BPMNPlane>\` é OBRIGATÓRIA.
+- **DESENHE TUDO (1 PARA 1)**: Para CADA elemento lógico definido na seção \`<bpmn:process>\` ou \`<bpmn:collaboration>\` (como tasks, gateways, events), DEVE haver um elemento visual correspondente (\`BPMNShape\` ou \`BPMNEdge\`) dentro do \`<bpmndi:BPMNPlane>\`.
+- **IDS CONSISTENTES**: O atributo \`bpmnElement\` em cada \`BPMNShape\` e \`BPMNEdge\` DEVE corresponder ao \`id\` do elemento lógico que ele representa.
+
+---
+## PARTE 2: Geração de XML DMN 1.3 (Opcional)
+
+Sua segunda tarefa é identificar se o processo descrito contém um ponto de decisão claro e baseado em regras.
+
+### TAREFA DMN
+- **SE** a descrição do processo contiver uma decisão explícita (ex: "SE condição X E condição Y, ENTÃO resultado A"), você DEVE gerar o XML da tabela de decisão.
+- **SE NÃO** houver uma decisão clara ou baseada em regras descrita, o valor para "dmn_xml" no output final DEVE ser \`null\`.
+
+### REGRAS RÍGIDAS DE FORMATAÇÃO XML DMN (ESSENCIAL PARA A VALIDAÇÃO):
+- **VERSÃO DO DMN**: O XML deve seguir estritamente o padrão DMN 1.3.
+- **NAMESPACES**: O elemento raiz \`<definitions>\` OBRIGATORIAMENTE deve conter os seguintes namespaces:
+\`\`\`xml
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="definitions_1" name="decisao" namespace="http://camunda.org/schema/1.0/dmn">
+\`\`\`
+- **ESTRUTURA HIERÁRQUICA**: A estrutura deve ser: \`<definitions> -> <decision> -> <decisionTable>\`.
+- **COLUNAS (INPUT/OUTPUT)**: As colunas são definidas pelas tags \`<input>\` e \`<output>\`. Cada uma deve ter um \`id\` e \`label\`. O \`<input>\` também precisa de um \`<inputExpression>\`.
+- **REGRAS (RULE)**: Cada linha da tabela é uma tag \`<rule>\` com um \`id\` único.
+- **CÉLULAS (ENTRY)**: As células dentro de uma regra são definidas pelas tags \`<inputEntry>\` e \`<outputEntry>\`.
+- **CONTEÚDO DA CÉLULA (TEXT)**: O valor de cada célula DEVE estar dentro de uma tag \`<text>\`. Exemplo: \`<inputEntry><text>"Condição A"</text></inputEntry>\`.
+
+---
+# FORMATO DO OUTPUT
+Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chave "processo_visual". O valor de "dmn_xml" deve ser uma string XML válida ou \`null\`.
 {
-  "processo_visual": { "bpmn_xml": "<?xml ...>", "dmn_xml": null }
+  "processo_visual": {
+    "bpmn_xml": "<?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?>...",
+    "dmn_xml": "<?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?>..."
+  }
 }`;
 
 const getAnalysisPrompt = (description: string, results: Partial<AnalysisResult>): string => `
@@ -181,7 +213,7 @@ Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chav
   "analise_dados_pessoais": { "dados_identificados": [], "dados_sensiveis_identificados": [] }
 }`;
 
-const getInventoryPrompt = (description: string, results: Partial<AnalysisResult>): string => `
+export const getInventoryPrompt = (description: string, results: Partial<AnalysisResult>): string => `
 # ROLE
 Você é um Especialista em Conformidade LGPD. Sua tarefa é preencher o Inventário de Dados Pessoais (IDP) para o processo descrito.
 ${getBaseContextPrompt(description, results)}
@@ -301,7 +333,7 @@ Sua resposta DEVE SER ESTRITAMENTE um único objeto JSON válido contendo a chav
 }
 `;
 
-const getRipdPrompt = (description: string, results: Partial<AnalysisResult>): string => `
+export const getRipdPrompt = (description: string, results: Partial<AnalysisResult>): string => `
 # ROLE
 Você é um Especialista Sênior em Conformidade e Privacidade de Dados.
 
@@ -386,13 +418,13 @@ Sua tarefa é preencher o modelo de Relatório de Impacto à Proteção de Dados
 ---
 ## 7. APROVAÇÃO
 
-<br><br>
+
 
 _________________________________________
 **<NOME DO RESPONSÁVEL PELA ELABORAÇÃO>**
 *Responsável pela Elaboração do RIPD*
 
-<br><br>
+
 
 _________________________________________
 **Volnei Velleda Rodrigues**
@@ -441,30 +473,18 @@ O usuário forneceu uma análise de processo gerada anteriormente (no formato JS
 # TASK
 1.  Analise a Saída JSON Anterior.
 2.  Interprete a Instrução de Correção do usuário.
-3.  Aplique a Correção em TODOS os artefatos relevantes (BPMN, análise de dados, IDP, RIPD, etc.) para garantir consistência.
+3.  Aplique a Correção em TODOS os artefatos relevantes (BPMN, DMN, análise de dados, IDP, RIPD, etc.) para garantir consistência.
 4.  Gere uma Nova Saída Completa, retornando um NOVO objeto JSON COMPLETO, mantendo a mesma estrutura do JSON original, mas com as correções aplicadas.
 
 # REGRAS DE GERAÇÃO PARA ARTEFATOS VISUAIS (BPMN & DMN)
-Ao regenerar o artefato \`processo_visual\`, você DEVE seguir as mesmas regras estritas da geração inicial para garantir que os diagramas sejam válidos e renderizáveis. A falha em seguir estas regras resultará em um erro para o usuário.
+Ao regenerar o artefato \`processo_visual\`, você DEVE seguir as mesmas regras estritas da geração inicial para garantir que os diagramas sejam válidos e renderizáveis.
 
 ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE BPMN (LEIA COM ATENÇÃO)
-O XML do BPMN 2.0 gerado DEVE ser 100% válido e visualmente renderizável. A falha em seguir estas regras resultará em um diagrama que não pode ser desenhado.
-#### Regra 0: DOCUMENTO BEM FORMADO (A MAIS IMPORTANTE)
-- O output DEVE começar SEMPRE com a declaração XML: \`<?xml version="1.0" encoding="UTF-8"?>\`.
-- O elemento raiz do documento DEVE ser SEMPRE \`<bpmn:definitions>\`.
-- O namespace principal do BPMN DEVE ser \`http://www.omg.org/spec/BPMN/20100524/MODEL\`.
-#### VALIDAÇÃO LÓgica (A ESTRUTURA):
-1. REFERÊNCIAS COMPLETAS: Todo \`<bpmn:sequenceFlow>\` e \`<bpmn:messageFlow>\` DEVE OBRIGATÓRIO ter os atributos \`sourceRef\` e \`targetRef\` preenchidos com IDs válidos de elementos existentes no modelo. É PROIBIDO omitir qualquer um desses atributos.
-2. FLUXOS DE MENSAGEM: \`<bpmn:messageFlow>\` só pode conectar elementos em PARTICIPANTES (\`<bpmn:participant>\`) diferentes.
-#### VALIDAÇÃO VISUAL (O DESENHO - BPMNDI):
-1. SEÇÃO BPMNDI OBRIGATÓRIA: A seção completa \`<bpmndi:BPMNDiagram>\` com um \`<bpmndi:BPMNPlane>\` é OBRIGATÓRIA.
-2. DESENHE TUDO (1 PARA 1): Para CADA elemento lógico definido na seção \`<bpmn:process>\` ou \`<bpmn:collaboration>\`, DEVE haver um elemento visual correspondente dentro do \`<bpmndi:BPMNPlane>\`.
-3. IDS CONSISTENTES: O atributo \`bpmnElement\` em cada \`BPMNShape\` e \`BPMNEdge\` DEVE corresponder ao \`id\` do elemento lógico que ele representa.
+- **REFERÊNCIAS COMPLETAS (ABSOLUTAMENTE OBRIGATÓRIO)**: CADA \`<bpmn:sequenceFlow>\` e CADA \`<bpmn:messageFlow>\` DEVE OBRIGATORIAMENTE ter os atributos \`sourceRef\` e \`targetRef\` preenchidos com IDs válidos. É ESTRITAMENTE PROIBIDO omitir qualquer um deles.
+- **SEÇÃO BPMNDI OBRIGATÓRIA**: CADA elemento lógico DEVE ter um elemento visual correspondente em \`<bpmndi:BPMNPlane>\`.
 
-// ### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
-// Comentado para desabilitar a funcionalidade DMN
-// O valor para "dmn_xml" DEVE ser \`null\`.
-
+### REGRAS CRÍTICAS E OBRIGATÓRIAS PARA GERAÇÃO DE DMN 1.3 (SE APLICÁVEL)
+- Se o processo contiver uma decisão, gere o XML DMN 1.3 seguindo as mesmas regras da geração inicial. Se a correção remover a decisão ou se não houver nenhuma, o valor para "dmn_xml" DEVE ser \`null\`.
 
 # JSON ANTERIOR (PARA CORRIGIR)
 \`\`\`json

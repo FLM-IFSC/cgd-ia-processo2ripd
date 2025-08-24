@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Header } from './components/Header/index';
 import { ProcessInput } from './components/ProcessInput/index';
 import { ResultsDisplay } from './components/ResultsDisplay/index';
+import { SettingsModal } from './components/SettingsModal/index';
 import * as geminiService from './services/geminiService';
 import { AnalysisResult } from './types/index';
 
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   const [theme, setTheme] = useState<Theme>('light');
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Effect to set initial theme based on OS preference
   useEffect(() => {
@@ -183,7 +185,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen font-sans flex flex-col items-center bg-background-light dark:bg-background-dark text-on-surface-light dark:text-on-surface-dark transition-colors duration-200">
-      <Header theme={theme} toggleTheme={toggleTheme} onReset={handleReset} />
+      <Header theme={theme} toggleTheme={toggleTheme} onReset={handleReset} onOpenSettings={() => setIsSettingsModalOpen(true)} />
       <main className="flex-grow w-full max-w-screen-2xl px-4 md:px-8 py-8">
         <div className="w-full h-full grid grid-cols-1 lg:grid-cols-3 gap-8">
           
@@ -263,6 +265,7 @@ const App: React.FC = () => {
           Desenvolvido por FLM na Coordenadoria de Gestão de Dados (CGD) da DTIC do IFSC - Reitoria. Dúvidas ou sugestões, entre em contato pelo e-mail: <a href="mailto:coord.gestao.dados@ifsc.edu.br" className="text-ifsc-green hover:underline">coord.gestao.dados@ifsc.edu.br</a>
         </p>
       </footer>
+      <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
     </div>
   );
 };
