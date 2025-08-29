@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import * as geminiService from '../../services/geminiService';
+import * as prompts from '../../services/prompts';
+import { AnalysisResult } from '../../types/index';
 
 // Subcomponente para exibir um único prompt de forma consistente
 const PromptViewer: React.FC<{ title: string; prompt: string }> = ({ title, prompt }) => (
@@ -38,9 +39,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     }, [onClose]);
 
     // Obtém os templates dos prompts chamando as funções de serviço com dados vazios
-    const visualPrompt = geminiService.getVisualPrompt();
-    const inventoryPrompt = geminiService.getInventoryPrompt('', {});
-    const ripdPrompt = geminiService.getRipdPrompt('', {});
+    const visualPrompt = prompts.getVisualPrompt();
+    const analysisPrompt = prompts.getAnalysisPrompt('', {});
+    const inventoryPrompt = prompts.getInventoryPrompt('', {});
+    const ripdPrompt = prompts.getRipdPrompt('', {});
+    const suggestionsPrompt = prompts.getSuggestionsPrompt('', {});
+    const logPrompt = prompts.getLogPrompt('', {});
+    const refinePrompt = prompts.getRefineVisualPrompt({} as AnalysisResult, '"Sua instrução de correção aqui"');
+
 
     return (
         <div 
@@ -66,9 +72,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     <p className="text-sm text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-6">
                         Estes são os prompts mestres que instruem a Inteligência Artificial. A capacidade de edição e personalização será implementada em futuras versões.
                     </p>
-                    <PromptViewer title="Análise e Geração de BPMN" prompt={visualPrompt} />
-                    <PromptViewer title="Geração do Inventário (IDP)" prompt={inventoryPrompt} />
-                    <PromptViewer title="Geração do Relatório de Impacto (RIPD)" prompt={ripdPrompt} />
+                    <PromptViewer title="1. Análise e Geração de BPMN/DMN" prompt={visualPrompt} />
+                    <PromptViewer title="2. Análise de Dados Pessoais" prompt={analysisPrompt} />
+                    <PromptViewer title="3. Geração do Inventário (IDP)" prompt={inventoryPrompt} />
+                    <PromptViewer title="4. Geração do Relatório de Impacto (RIPD)" prompt={ripdPrompt} />
+                    <PromptViewer title="5. Geração de Sugestões de Automação" prompt={suggestionsPrompt} />
+                    <PromptViewer title="6. Geração do Log de Análise da IA" prompt={logPrompt} />
+                    <PromptViewer title="7. Refinamento de Artefato (Ex: Processo Visual)" prompt={refinePrompt} />
                 </main>
             </div>
         </div>

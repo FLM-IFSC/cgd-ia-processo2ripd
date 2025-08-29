@@ -4,12 +4,22 @@ import { ProcessInput } from './components/ProcessInput/index';
 import { ResultsDisplay } from './components/ResultsDisplay/index';
 import { SettingsModal } from './components/SettingsModal/index';
 import * as geminiService from './services/geminiService';
-import { AnalysisResult } from './types/index';
+import { AnalysisResult, Tab } from './types/index';
 
 type ArtifactKey = keyof AnalysisResult;
 type Theme = 'light' | 'dark';
 
 const EXAMPLE_PROCESS_TEXT = `O processo consiste em receber a descrição de uma atividade do IFSC (via texto, imagem ou modelo Bizagi) e convertê-la para os padrões visuais BPMN (fluxo) e DMN (decisões). A partir desta modelagem, a plataforma extrai e estrutura os dados no Inventário de Dados Pessoais (IDP) e, com base na análise de risco, gera o Relatório de Impacto à Proteção de Dados (RIPD) como o artefato final de conformidade.`;
+
+const artifactTabMap: Record<Tab, ArtifactKey | null> = {
+    visual: 'processo_visual',
+    decisao: 'processo_visual',
+    analise: 'analise_dados_pessoais',
+    inventario: 'inventario_idp',
+    ripd: 'rascunho_ripd',
+    sugestoes: 'sugestoes_automacao',
+    log: 'log_analise',
+};
 
 const App: React.FC = () => {
   const [processDescription, setProcessDescription] = useState<string>(EXAMPLE_PROCESS_TEXT);
@@ -22,6 +32,8 @@ const App: React.FC = () => {
   const [generating, setGenerating] = useState<Partial<Record<ArtifactKey, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<ArtifactKey, string | null>>>({});
   const [results, setResults] = useState<Partial<AnalysisResult>>({});
+
+  const [activeTab, setActiveTab] = useState<Tab>('visual');
 
   const [thinkingLogs, setThinkingLogs] = useState<Partial<Record<ArtifactKey | 'refining', string[]>>>({});
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +77,7 @@ const App: React.FC = () => {
     setGenerating({});
     setErrors({});
     setThinkingLogs({});
+    setActiveTab('visual');
   }, []);
 
   const handleAnalyze = useCallback(async () => {
@@ -72,7 +85,15 @@ const App: React.FC = () => {
       setErrors({ processo_visual: 'Por favor, descreva o processo ou envie um arquivo.' });
       return;
     }
-    handleReset(); // Reset everything for a new analysis
+    
+    // Reset results state without clearing inputs for a new analysis
+    setCorrectionText('');
+    setIsRefining(false);
+    setResults({});
+    setGenerating({});
+    setErrors({});
+    setActiveTab('visual');
+    
     setIsLoading(true);
     setThinkingLogs({ processo_visual: [] });
 
@@ -96,7 +117,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [processDescription, uploadedFile, handleReset]);
+  }, [processDescription, uploadedFile]);
 
   const handleGenerateArtifact = useCallback(async (artifact: ArtifactKey) => {
     setGenerating(prev => ({ ...prev, [artifact]: true }));
@@ -143,19 +164,27 @@ const App: React.FC = () => {
         setErrors(prev => ({...prev, [artifact]: errorMsg}));
         console.error(err);
     } finally {
+        generating[artifact] = false;
         setGenerating(prev => ({ ...prev, [artifact]: false }));
     }
 
-  }, [processDescription, uploadedFile, results]);
+  }, [processDescription, uploadedFile, results, generating]);
 
 
   const handleRefine = useCallback(async () => {
     if (!results || !correctionText.trim()) {
       return;
     }
+
+    const artifactToRefine = artifactTabMap[activeTab];
+    if (!artifactToRefine) {
+        console.warn(`Refinement not applicable for tab: ${activeTab}`);
+        return;
+    }
+
     setIsRefining(true);
-    setErrors({});
-    setThinkingLogs(prev => ({...prev, refining: []}));
+    setErrors(prev => ({ ...prev, [artifactToRefine]: null }));
+    setThinkingLogs(prev => ({...prev, refining: []})); // Use dedicated 'refining' log
 
     try {
       const onThinkingUpdate = (update: string) => {
@@ -165,23 +194,72 @@ const App: React.FC = () => {
         }));
       };
 
-      const refinedAnalysis = await geminiService.refineProcess(
+      const refinedArtifact = await geminiService.refineArtifact(
+        artifactToRefine,
         results as AnalysisResult,
         correctionText,
         onThinkingUpdate
       );
-      setResults(refinedAnalysis);
+
+      setResults(prev => ({ ...prev, ...refinedArtifact }));
+      setCorrectionText(''); // Clear input on success
     } catch (err) {
-       const errorMsg = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
-       setErrors({ processo_visual: `Falha ao refinar: ${errorMsg}`});
+       const errorMsg = err instanceof Error ? err.message : 'Falha ao refinar: ${errorMsg}';
+       setErrors(prev => ({...prev, [artifactToRefine]: `Falha ao refinar: ${errorMsg}`}));
        console.error(err);
     } finally {
       setIsRefining(false);
     }
-  }, [results, correctionText]);
+  }, [results, correctionText, activeTab]);
+
+  const handleTabClick = (tabId: Tab) => {
+    setActiveTab(tabId);
+    const artifactKey = artifactTabMap[tabId];
+    if (artifactKey && !results[artifactKey] && !generating[artifactKey] && !errors[artifactKey]) {
+      handleGenerateArtifact(artifactKey);
+    }
+  };
   
+  const handleDiagramUpdate = useCallback((newXml: string) => {
+    setResults(prev => {
+        if (!prev.processo_visual) return prev; // Should not happen
+        return {
+            ...prev,
+            processo_visual: {
+                ...prev.processo_visual,
+                bpmn_xml: newXml,
+            },
+        };
+    });
+  }, []);
+
   const hasResults = Object.keys(results).length > 0;
   const processLog = thinkingLogs.processo_visual || [];
+  
+  const TabButton = ({ tabId, children, disabled }: { tabId: Tab, children: React.ReactNode, disabled?: boolean }) => (
+    <button 
+        onClick={() => !disabled && handleTabClick(tabId)} 
+        className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === tabId ? 'bg-ifsc-green text-white shadow' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}
+        disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+
+    const Arrow: React.FC<{ disabled?: boolean }> = ({ disabled }) => (
+        <div className="flex items-center" aria-hidden="true">
+            <svg className={`h-5 w-5 ${disabled ? 'text-gray-300 dark:text-gray-600' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+        </div>
+    );
+  
+  const isDecisaoDisabled = !results.processo_visual;
+  const isAnaliseDisabled = !results.processo_visual;
+  const isInventarioDisabled = !results.analise_dados_pessoais;
+  const isRipdDisabled = !results.inventario_idp;
+  const isSugestoesDisabled = !results.processo_visual;
+  const isLogDisabled = !results.processo_visual;
 
   return (
     <div className="min-h-screen font-sans flex flex-col items-center bg-background-light dark:bg-background-dark text-on-surface-light dark:text-on-surface-dark transition-colors duration-200">
@@ -203,6 +281,24 @@ const App: React.FC = () => {
           </div>
           
           <div className="lg:col-span-2 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark p-6 flex flex-col min-h-[500px] h-full">
+            <h2 className="text-xl font-semibold text-on-surface-light dark:text-on-surface-dark mb-4">2. Artefatos Gerados</h2>
+            <div className="border-b border-border-light dark:border-border-dark mb-4">
+              <nav className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-2 -mb-px" aria-label="Tabs">
+                <TabButton tabId="visual">Processo (BPMN)</TabButton>
+                <Arrow disabled={isDecisaoDisabled} />
+                <TabButton tabId="decisao" disabled={isDecisaoDisabled}>Decisão (DMN)</TabButton>
+                <Arrow disabled={isAnaliseDisabled} />
+                <TabButton tabId="analise" disabled={isAnaliseDisabled}>Dados Pessoais</TabButton>
+                <Arrow disabled={isInventarioDisabled} />
+                <TabButton tabId="inventario" disabled={isInventarioDisabled}>Inventário de Dados</TabButton>
+                <Arrow disabled={isRipdDisabled} />
+                <TabButton tabId="ripd" disabled={isRipdDisabled}>Relatório de Impacto</TabButton>
+                <div className="h-4 border-l border-border-light dark:border-border-dark mx-2 sm:mx-3 self-center"></div>
+                <TabButton tabId="sugestoes" disabled={isSugestoesDisabled}>Sugestões</TabButton>
+                <TabButton tabId="log" disabled={isLogDisabled}>Log IA</TabButton>
+              </nav>
+            </div>
+            
             {isLoading && (
               <div className="flex-grow flex flex-col items-center justify-center text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark">
                 <svg className="animate-spin h-10 w-10 text-ifsc-green mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -222,6 +318,7 @@ const App: React.FC = () => {
             
             {hasResults && !isLoading && (
               <ResultsDisplay
+                activeTab={activeTab}
                 results={results}
                 correctionText={correctionText}
                 onCorrectionTextChange={(e) => setCorrectionText(e.target.value)}
@@ -231,8 +328,10 @@ const App: React.FC = () => {
                 generatingStatus={generating}
                 errorStatus={errors}
                 thinkingLogs={thinkingLogs}
+                onDiagramUpdate={handleDiagramUpdate}
               />
             )}
+
              {!hasResults && !isLoading && (
                 <div className="flex-grow flex flex-col items-center justify-center text-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark">
                     {errors.processo_visual ? (

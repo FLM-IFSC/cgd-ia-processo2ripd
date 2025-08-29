@@ -163,3 +163,5 @@ export interface AnalysisResult {
   sugestoes_automacao?: SugestoesAutomacao;
   log_analise?: LogAnalise;
 }
+
+export type Tab = 'visual' | 'decisao' | 'analise' | 'inventario' | 'ripd' | 'sugestoes' | 'log';

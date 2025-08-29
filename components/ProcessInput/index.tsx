@@ -119,11 +119,13 @@ export const ProcessInput: React.FC<ProcessInputProps> = ({ textValue, onTextCha
         </div>
       </div>
 
-
+      <p className="text-center text-sm text-on-surface-secondary-light dark:text-on-surface-secondary-dark mt-6 mb-2">
+          Para começar, analise o processo de exemplo ou insira a sua própria descrição/arquivo e clique no botão abaixo.
+      </p>
       <button
         onClick={onAnalyze}
         disabled={isLoading || !hasInput}
-        className="mt-6 w-full bg-ifsc-green text-white font-bold py-3 px-4 rounded-lg hover:bg-ifsc-green-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-light dark:focus:ring-offset-surface-dark focus:ring-ifsc-green disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+        className="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-light dark:focus:ring-offset-surface-dark focus:ring-red-500 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
       >
         {isLoading ? (
           <>

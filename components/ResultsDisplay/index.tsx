@@ -1,24 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, IStylesOptions } from 'docx';
-import { AnalysisResult, AnaliseDadosPessoais, DadosPessoaisItem, InventarioIDP, RascunhoRIPD, SugestoesAutomacao, LogAnalise } from '../../types/index';
+import { AnalysisResult, AnaliseDadosPessoais, DadosPessoaisItem, InventarioIDP, RascunhoRIPD, SugestoesAutomacao, LogAnalise, Tab } from '../../types/index';
 import { BpmnViewer } from '../BpmnViewer/index';
 import { DmnViewer } from '../DmnViewer/index';
 
 type ArtifactKey = keyof AnalysisResult;
-type Tab = 'visual' | 'decisao' | 'analise' | 'inventario' | 'ripd' | 'sugestoes' | 'log';
-
-const artifactTabMap: Record<Tab, ArtifactKey | null> = {
-    visual: 'processo_visual',
-    decisao: 'processo_visual',
-    analise: 'analise_dados_pessoais',
-    inventario: 'inventario_idp',
-    ripd: 'rascunho_ripd',
-    sugestoes: 'sugestoes_automacao',
-    log: 'log_analise',
-};
 
 interface ResultsDisplayProps {
+    activeTab: Tab;
     results: Partial<AnalysisResult>;
     correctionText: string;
     onCorrectionTextChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -28,9 +18,23 @@ interface ResultsDisplayProps {
     generatingStatus: Partial<Record<ArtifactKey, boolean>>;
     errorStatus: Partial<Record<ArtifactKey, string | null>>;
     thinkingLogs: Partial<Record<ArtifactKey | 'refining', string[]>>;
+    onDiagramUpdate: (newXml: string) => void;
 }
 
 // --- Helper Functions ---
+
+const getArtifactName = (tab: Tab): string => {
+    switch(tab) {
+        case 'visual': return 'Processo (BPMN)';
+        case 'decisao': return 'Decisão (DMN)';
+        case 'analise': return 'Análise de Dados';
+        case 'inventario': return 'Inventário de Dados';
+        case 'ripd': return 'Relatório de Impacto';
+        case 'sugestoes': return 'Sugestões';
+        case 'log': return 'Log da IA';
+        default: return 'Artefato';
+    }
+};
 
 const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -188,8 +192,8 @@ const SugestoesView: React.FC<{ suggestions: SugestoesAutomacao }> = ({ suggesti
     <div className="space-y-3">
         {suggestions.map((suggestion, index) => (
             <div key={index} className="flex items-start p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-border-light dark:border-border-dark">
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3 text-ifsc-green flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 S0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3 text-ifsc-green flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
                 <p className="text-sm text-on-surface-light dark:text-on-surface-dark">{suggestion}</p>
             </div>
@@ -197,9 +201,87 @@ const SugestoesView: React.FC<{ suggestions: SugestoesAutomacao }> = ({ suggesti
     </div>
 );
 
-const LogView: React.FC<{ log: LogAnalise }> = ({ log }) => (
-    <div className="p-3 bg-background-light dark:bg-black/50 rounded-lg border border-border-light dark:border-border-dark font-mono text-xs text-on-surface-secondary-light dark:text-on-surface-secondary-dark whitespace-pre-wrap">{log}</div>
-);
+const LogView: React.FC<{ log: LogAnalise }> = ({ log }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(log).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    const handleDownload = () => {
+        const blob = new Blob([log], { type: 'text/plain;charset=utf-8' });
+        downloadBlob(blob, 'log_analise_ia.txt');
+    };
+    
+    const renderParsedLog = () => {
+        if (!log) return null;
+        // Split into sections based on the double newline, then render each part.
+        return log.split('\n\n').map((section, index) => {
+            const trimmedSection = section.trim();
+            // Render main headings (e.g., **1. Title:**)
+            if (trimmedSection.match(/^\*\*\d+\..*?\*\*$/)) {
+                 return <h3 key={index} className="text-md font-semibold mt-4 mb-2 text-on-surface-light dark:text-on-surface-dark">{trimmedSection.replace(/\*\*/g, '')}</h3>;
+            }
+            // Render list items (e.g., *   **Action:** ...)
+            if(trimmedSection.startsWith('*')) {
+                return (
+                    <div key={index} className="space-y-2">
+                        {trimmedSection.split('\n').map((line, lineIndex) => {
+                             const lineContent = line.replace(/^\*\s+/, '').trim();
+                             const parts = lineContent.split(/:(.*)/s); // Split on the first colon
+                             if (parts.length > 1) {
+                                 const label = parts[0].replace(/\*\*/g, '');
+                                 const value = parts[1].trim();
+                                 return (
+                                     <div key={lineIndex} className="pl-4 border-l-2 border-ifsc-green/30">
+                                         <p><strong className="font-semibold text-on-surface-light dark:text-on-surface-dark">{label}:</strong> <span className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark">{value}</span></p>
+                                     </div>
+                                 )
+                             }
+                             return <p key={lineIndex}>{lineContent}</p>;
+                        })}
+                    </div>
+                );
+            }
+            // Render regular paragraphs
+            return <p key={index} className="text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-2">{trimmedSection}</p>;
+        });
+    };
+
+    return (
+        <div className="flex flex-col w-full h-full border border-border-light dark:border-border-dark rounded-lg bg-surface-light dark:bg-surface-dark overflow-hidden">
+            <div className="flex justify-between items-center px-4 py-2 bg-gray-50 dark:bg-white/5 text-xs border-b border-border-light dark:border-border-dark flex-wrap gap-2">
+                <span className="font-mono font-semibold text-on-surface-secondary-light dark:text-on-surface-secondary-dark">LOG DE ANÁLISE DA IA</span>
+                <div className="flex items-center space-x-2">
+                     <button onClick={handleDownload} className="flex items-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark hover:text-ifsc-green dark:hover:text-ifsc-green transition-colors text-xs">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        Download (.txt)
+                     </button>
+                     <div className="h-4 border-l border-border-light dark:border-border-dark mx-1"></div>
+                    <button onClick={handleCopy} className="flex items-center text-on-surface-secondary-light dark:text-on-surface-secondary-dark hover:text-ifsc-green dark:hover:text-ifsc-green transition-colors text-xs">
+                         {copied ? (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                Copiado!
+                            </>
+                        ) : (
+                            <>
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                 Copiar Texto
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+            <div className="p-4 overflow-y-auto text-sm">
+                {renderParsedLog()}
+            </div>
+        </div>
+    );
+};
 
 const LogViewer: React.FC<{ log: string[], title: string }> = ({ log, title }) => {
     const logContainerRef = useRef<HTMLDivElement>(null);
@@ -244,9 +326,18 @@ const ErrorComponent: React.FC<{message: string}> = ({ message }) => (
 // --- Main Component ---
 
 export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
-  const { results, correctionText, onCorrectionTextChange, onRefine, isRefining, onGenerateArtifact, generatingStatus, errorStatus, thinkingLogs } = props;
-  const [activeTab, setActiveTab] = useState<Tab>('visual');
+  const { activeTab, results, correctionText, onCorrectionTextChange, onRefine, isRefining, generatingStatus, errorStatus, thinkingLogs, onDiagramUpdate } = props;
   const [isExporting, setIsExporting] = useState<Partial<Record<'csv' | 'docx', boolean>>>({});
+  
+  const artifactTabMap: Record<Tab, ArtifactKey | null> = {
+    visual: 'processo_visual',
+    decisao: 'processo_visual',
+    analise: 'analise_dados_pessoais',
+    inventario: 'inventario_idp',
+    ripd: 'rascunho_ripd',
+    sugestoes: 'sugestoes_automacao',
+    log: 'log_analise',
+  };
 
   const handleExportCsv = async () => {
     if (!results.inventario_idp) return;
@@ -349,14 +440,6 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
         setIsExporting(prev => ({ ...prev, docx: false }));
     }
   };
-  
-  const handleTabClick = (tabId: Tab) => {
-    setActiveTab(tabId);
-    const artifactKey = artifactTabMap[tabId];
-    if (artifactKey && !results[artifactKey] && !generatingStatus[artifactKey] && !errorStatus[artifactKey]) {
-      onGenerateArtifact(artifactKey);
-    }
-  };
 
   const renderContent = () => {
     const artifactKey = artifactTabMap[activeTab];
@@ -398,7 +481,7 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
     switch (activeTab) {
       case 'visual':
         if (!results.processo_visual) return null;
-        return <BpmnViewer xml={results.processo_visual.bpmn_xml} />;
+        return <BpmnViewer xml={results.processo_visual.bpmn_xml} onXmlChange={onDiagramUpdate} />;
       case 'decisao':
         if (!results.processo_visual) return null;
         return results.processo_visual.dmn_xml ? (
@@ -439,64 +522,18 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
     }
   };
   
-  const isDecisaoDisabled = !results.processo_visual;
-  const isAnaliseDisabled = !results.processo_visual;
-  const isInventarioDisabled = !results.analise_dados_pessoais;
-  const isRipdDisabled = !results.inventario_idp;
-  const isSugestoesDisabled = !results.processo_visual;
-  const isLogDisabled = !results.processo_visual;
-
-  const TabButton = ({ tabId, children, disabled }: { tabId: Tab, children: React.ReactNode, disabled?: boolean }) => (
-    <button 
-        onClick={() => !disabled && handleTabClick(tabId)} 
-        className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === tabId ? 'bg-ifsc-green text-white shadow' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}
-        disabled={disabled}
-    >
-      {children}
-    </button>
-  );
-
-    const Arrow: React.FC<{ disabled?: boolean }> = ({ disabled }) => (
-        <div className="flex items-center" aria-hidden="true">
-            <svg className={`h-5 w-5 ${disabled ? 'text-gray-300 dark:text-gray-600' : 'text-on-surface-secondary-light dark:text-on-surface-secondary-dark'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-            </svg>
-        </div>
-    );
-
   const refiningLog = thinkingLogs.refining || [];
+  const artifactName = getArtifactName(activeTab);
 
   return (
-    <div className="flex flex-col h-full">
-      <div>
-        <h2 className="text-xl font-semibold text-on-surface-light dark:text-on-surface-dark mb-4">2. Artefatos Gerados</h2>
-        <div className="border-b border-border-light dark:border-border-dark mb-4">
-          <nav className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-2 -mb-px" aria-label="Tabs">
-            <TabButton tabId="visual">Processo (BPMN)</TabButton>
-            <Arrow disabled={isDecisaoDisabled} />
-            <TabButton tabId="decisao" disabled={isDecisaoDisabled}>Decisão (DMN)</TabButton>
-            <Arrow disabled={isAnaliseDisabled} />
-            <TabButton tabId="analise" disabled={isAnaliseDisabled}>Dados Pessoais</TabButton>
-            <Arrow disabled={isInventarioDisabled} />
-            <TabButton tabId="inventario" disabled={isInventarioDisabled}>Inventário de Dados</TabButton>
-            <Arrow disabled={isRipdDisabled} />
-            <TabButton tabId="ripd" disabled={isRipdDisabled}>Relatório de Impacto</TabButton>
-            
-            <div className="h-4 border-l border-border-light dark:border-border-dark mx-2 sm:mx-3 self-center"></div>
-
-            <TabButton tabId="sugestoes" disabled={isSugestoesDisabled}>Sugestões</TabButton>
-            <TabButton tabId="log" disabled={isLogDisabled}>Log IA</TabButton>
-          </nav>
-        </div>
-      </div>
-      
+    <div className="flex flex-col h-full flex-grow">
       <div className="flex-grow overflow-y-auto p-1 pr-2 -mr-2 min-h-0">
         {renderContent()}
       </div>
 
-      <div className="mt-6 border-t border-border-light dark:border-border-dark pt-6">
-        <h3 className="text-lg font-semibold text-on-surface-light dark:text-on-surface-dark mb-2">3. Corrigir ou Refinar Análise</h3>
-        <p className="text-sm text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-4">Descreva as alterações desejadas. A IA irá regenerar todos os artefatos para garantir consistência.</p>
+      <div className="mt-6 border-t border-border-light dark:border-border-dark pt-6 flex-shrink-0">
+        <h3 className="text-lg font-semibold text-on-surface-light dark:text-on-surface-dark mb-2">3. Corrigir ou Refinar {artifactName}</h3>
+        <p className="text-sm text-on-surface-secondary-light dark:text-on-surface-secondary-dark mb-4">Descreva as alterações desejadas. A IA irá regenerar apenas este artefato para garantir consistência.</p>
         <textarea
           value={correctionText}
           onChange={onCorrectionTextChange}
@@ -514,10 +551,10 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = (props) => {
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               Refinando...
             </>
-          ) : ( 'Refinar Análise Completa' )}
+          ) : ( `Refinar ${artifactName}` )}
         </button>
         {isRefining && refiningLog.length > 0 && (
-            <LogViewer log={refiningLog} title="Log de Refinamento:" />
+            <LogViewer log={refiningLog} title={`Log de Refinamento (${artifactName}):`} />
         )}
       </div>
 
